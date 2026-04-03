@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import Header from '@/components/Header'
@@ -41,7 +42,7 @@ export default function CoralDetail() {
     async function fetchCoral() {
       try {
         const { data, error } = await supabase
-          .from('corals')
+          .from('coral_database')
           .select('*')
           .eq('id', id)
           .single()
@@ -99,15 +100,20 @@ export default function CoralDetail() {
         <div className="bg-slate-800 rounded-2xl overflow-hidden shadow-xl border border-slate-700">
 
           {/* Image */}
-          <div className="h-64 md:h-80 bg-gradient-to-br from-blue-900 to-teal-900 flex items-center justify-center overflow-hidden">
+          <div className="relative h-64 md:h-80 bg-gradient-to-br from-blue-900 to-teal-900">
             {coral.image_url ? (
-              <img
+              <Image
                 src={coral.image_url}
                 alt={coral.scientific_name}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 896px"
+                priority
               />
             ) : (
-              <span className="text-9xl">🪸</span>
+              <div className="h-full flex items-center justify-center">
+                <span className="text-9xl">🪸</span>
+              </div>
             )}
           </div>
 
@@ -197,6 +203,14 @@ export default function CoralDetail() {
                 )}
               </div>
             </div>
+
+            {/* Summary */}
+            {coral.summary && (
+              <div>
+                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">概要</h2>
+                <p className="text-slate-200 leading-relaxed">{coral.summary}</p>
+              </div>
+            )}
 
             {/* Description */}
             {coral.description && (

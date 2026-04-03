@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 
 const DIFFICULTY_STYLES = {
@@ -29,15 +30,19 @@ export default function CoralCard({ coral }) {
     <Link href={`/coral/${coral.id}`}>
       <div className="bg-slate-800 rounded-xl overflow-hidden hover:bg-slate-700 transition-all duration-200 hover:scale-105 cursor-pointer border border-slate-700 hover:border-blue-500 shadow-md h-full flex flex-col">
         {/* Image */}
-        <div className="h-40 bg-gradient-to-br from-blue-900 to-teal-900 flex items-center justify-center overflow-hidden flex-shrink-0">
+        <div className="relative h-40 bg-gradient-to-br from-blue-900 to-teal-900 flex-shrink-0">
           {coral.image_url ? (
-            <img
+            <Image
               src={coral.image_url}
               alt={coral.scientific_name}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             />
           ) : (
-            <span className="text-6xl">🪸</span>
+            <div className="h-full flex items-center justify-center">
+              <span className="text-6xl">🪸</span>
+            </div>
           )}
         </div>
 
@@ -59,6 +64,11 @@ export default function CoralCard({ coral }) {
           <h3 className="text-white font-semibold text-sm italic leading-tight">{coral.scientific_name}</h3>
           {coral.common_name_en && <p className="text-blue-300 text-sm mt-0.5">{coral.common_name_en}</p>}
           {coral.common_name_ja && <p className="text-blue-400 text-xs mt-0.5">{coral.common_name_ja}</p>}
+          {(coral.summary || coral.description) && (
+            <p className="text-slate-400 text-xs mt-1 line-clamp-2 leading-relaxed">
+              {coral.summary || coral.description}
+            </p>
+          )}
 
           <div className="mt-auto pt-2 space-y-1">
             {coral.origin_region && (

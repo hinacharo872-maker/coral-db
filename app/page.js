@@ -18,7 +18,7 @@ export default function Home() {
     async function fetchCorals() {
       try {
         const { data, error } = await supabase
-          .from('corals')
+          .from('coral_database')
           .select('*')
           .order('scientific_name')
         if (error) throw error
