@@ -5,25 +5,18 @@ import { supabase } from '@/lib/supabase'
 import CoralCard from '@/components/CoralCard'
 import Header from '@/components/Header'
 
-const CORAL_TYPES = [
-  { value: '',     label: 'すべて' },
-  { value: 'SPS',  label: 'SPS' },
-  { value: 'LPS',  label: 'LPS' },
-  { value: 'soft', label: 'ソフト' },
-]
-
 const DIFFICULTIES = [
-  { value: '',             label: 'すべて' },
-  { value: 'beginner',     label: '初心者' },
-  { value: 'intermediate', label: '中級者' },
-  { value: 'advanced',     label: '上級者' },
+  { value: '',  label: 'すべて' },
+  { value: '2', label: '初心者 (Lv.1-2)' },
+  { value: '3', label: '中級者 (Lv.3)' },
+  { value: '4', label: '上級者 (Lv.4-5)' },
 ]
 
 export default function Home() {
   const [records, setRecords] = useState([])
   const [search, setSearch]   = useState('')
-  const [coralType, setCoralType] = useState('')
   const [difficulty, setDifficulty] = useState('')
+  const [sourceType, setSourceType] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
 
@@ -33,7 +26,7 @@ export default function Home() {
         const { data, error } = await supabase
           .from('coral_encyclopedia')
           .select('*')
-          .order('coral_type', { ascending: true })
+          .order('id', { ascending: true })
         if (error) throw error
         setRecords(data ?? [])
       } catch (err) {
@@ -46,23 +39,33 @@ export default function Home() {
     fetchRecords()
   }, [])
 
+  const sourceTypes = useMemo(
+    () => [...new Set(records.map(r => r.source_type).filter(Boolean))],
+    [records]
+  )
+
   const filtered = useMemo(() => {
     let result = records
     if (search) {
       const q = search.toLowerCase()
       result = result.filter(r =>
-        r.common_name_ja?.toLowerCase().includes(q) ||
-        r.common_name_en?.toLowerCase().includes(q) ||
+        r.species_name?.toLowerCase().includes(q) ||
+        r.common_name?.toLowerCase().includes(q) ||
         r.scientific_name?.toLowerCase().includes(q) ||
-        r.genus?.toLowerCase().includes(q) ||
-        r.family?.toLowerCase().includes(q) ||
-        r.description?.toLowerCase().includes(q)
+        r.summary_jp?.toLowerCase().includes(q)
       )
     }
-    if (coralType) result = result.filter(r => r.coral_type === coralType)
-    if (difficulty) result = result.filter(r => r.difficulty === difficulty)
+    if (difficulty) {
+      const lv = Number(difficulty)
+      result = result.filter(r => {
+        if (lv <= 2) return r.difficulty != null && r.difficulty <= 2
+        if (lv === 3) return r.difficulty === 3
+        return r.difficulty != null && r.difficulty >= 4
+      })
+    }
+    if (sourceType) result = result.filter(r => r.source_type === sourceType)
     return result
-  }, [search, coralType, difficulty, records])
+  }, [search, difficulty, sourceType, records])
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -73,7 +76,7 @@ export default function Home() {
         <h1 className="text-4xl md:text-5xl font-bold mb-2">🪸 サンゴ図鑑</h1>
         <p className="text-blue-200 text-lg">Coral Encyclopedia</p>
         {!loading && records.length > 0 && (
-          <p className="text-blue-400 text-sm mt-3">{records.length} 種類のサンゴを収録</p>
+          <p className="text-blue-400 text-sm mt-3">{records.length} 件収録</p>
         )}
       </div>
 
@@ -81,10 +84,10 @@ export default function Home() {
       <div className="bg-blue-950/80 backdrop-blur border-b border-blue-900 py-4 px-4 sticky top-0 z-10 shadow-lg">
         <div className="max-w-6xl mx-auto space-y-3">
 
-          {/* Search input */}
+          {/* Search */}
           <input
             type="text"
-            placeholder="サンゴ名・学名・属名で検索..."
+            placeholder="サンゴ名・学名・英名で検索..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-blue-800 text-white placeholder-blue-500 focus:outline-none focus:border-blue-400 text-sm"
@@ -92,21 +95,6 @@ export default function Home() {
 
           {/* Tag filters */}
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-slate-400 text-xs font-medium shrink-0">種別:</span>
-            {CORAL_TYPES.map(t => (
-              <button
-                key={t.value}
-                onClick={() => setCoralType(t.value)}
-                className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                  coralType === t.value
-                    ? 'bg-blue-600 border-blue-500 text-white'
-                    : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-blue-500 hover:text-white'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-            <span className="text-slate-600 mx-1">|</span>
             <span className="text-slate-400 text-xs font-medium shrink-0">難易度:</span>
             {DIFFICULTIES.map(d => (
               <button
@@ -121,6 +109,35 @@ export default function Home() {
                 {d.label}
               </button>
             ))}
+            {sourceTypes.length > 0 && (
+              <>
+                <span className="text-slate-600 mx-1">|</span>
+                <span className="text-slate-400 text-xs font-medium shrink-0">ソース:</span>
+                <button
+                  onClick={() => setSourceType('')}
+                  className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                    sourceType === ''
+                      ? 'bg-blue-600 border-blue-500 text-white'
+                      : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-blue-500 hover:text-white'
+                  }`}
+                >
+                  すべて
+                </button>
+                {sourceTypes.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setSourceType(t)}
+                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                      sourceType === t
+                        ? 'bg-blue-600 border-blue-500 text-white'
+                        : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-blue-500 hover:text-white'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -146,7 +163,7 @@ export default function Home() {
             <div className="text-5xl mb-4">🔍</div>
             <p>該当するサンゴが見つかりませんでした</p>
             <button
-              onClick={() => { setSearch(''); setCoralType(''); setDifficulty('') }}
+              onClick={() => { setSearch(''); setDifficulty(''); setSourceType('') }}
               className="mt-4 text-sm text-blue-400 hover:text-blue-200 underline"
             >
               フィルターをリセット

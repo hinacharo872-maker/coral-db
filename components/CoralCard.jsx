@@ -1,31 +1,25 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
-const DIFFICULTY_CONFIG = {
-  beginner:     { label: '初心者',  color: 'bg-emerald-900 text-emerald-300 border border-emerald-700' },
-  intermediate: { label: '中級者',  color: 'bg-amber-900 text-amber-300 border border-amber-700' },
-  advanced:     { label: '上級者',  color: 'bg-rose-900 text-rose-300 border border-rose-700' },
+// difficulty は数値 (1〜5)
+function getDifficultyLabel(level) {
+  if (level == null) return null
+  if (level <= 2) return { label: '初心者',  color: 'bg-emerald-900 text-emerald-300 border border-emerald-700' }
+  if (level === 3) return { label: '中級者',  color: 'bg-amber-900 text-amber-300 border border-amber-700' }
+  return               { label: '上級者',  color: 'bg-rose-900 text-rose-300 border border-rose-700' }
 }
 
-const TYPE_CONFIG = {
-  SPS:  { color: 'bg-sky-900 text-sky-300 border border-sky-700' },
-  LPS:  { color: 'bg-violet-900 text-violet-300 border border-violet-700' },
-  soft: { label: 'ソフト', color: 'bg-teal-900 text-teal-300 border border-teal-700' },
-}
-
-const LIGHT_LABELS = {
-  low:       { label: '低',   icon: '○' },
-  medium:    { label: '中',   icon: '◑' },
-  high:      { label: '強',   icon: '●' },
-  very_high: { label: '超強', icon: '★' },
+const SOURCE_COLORS = {
+  Scholar:  'bg-sky-900 text-sky-300 border border-sky-700',
+  Book:     'bg-violet-900 text-violet-300 border border-violet-700',
+  Forum:    'bg-teal-900 text-teal-300 border border-teal-700',
 }
 
 export default function CoralCard({ coral }) {
   const imageUrl = coral.image_url
-  const difficulty = DIFFICULTY_CONFIG[coral.difficulty]
-  const type = TYPE_CONFIG[coral.coral_type]
-  const light = LIGHT_LABELS[coral.light_intensity]
-  const displayName = coral.common_name_ja || coral.common_name_en || coral.scientific_name
+  const difficulty = getDifficultyLabel(coral.difficulty)
+  const displayName = coral.species_name || coral.scientific_name
+  const sourceColor = SOURCE_COLORS[coral.source_type] ?? 'bg-slate-700 text-slate-300 border border-slate-600'
 
   return (
     <Link href={`/coral/${coral.id}`}>
@@ -46,10 +40,10 @@ export default function CoralCard({ coral }) {
               <span className="text-5xl opacity-60">🪸</span>
             </div>
           )}
-          {/* Type badge over image */}
-          {type && (
-            <span className={`absolute top-2 left-2 text-xs font-bold px-2 py-0.5 rounded-full ${type.color}`}>
-              {type.label ?? coral.coral_type}
+          {/* Source type badge */}
+          {coral.source_type && (
+            <span className={`absolute top-2 left-2 text-xs font-bold px-2 py-0.5 rounded-full ${sourceColor}`}>
+              {coral.source_type}
             </span>
           )}
         </div>
@@ -59,53 +53,49 @@ export default function CoralCard({ coral }) {
 
           {/* Names */}
           <div>
-            <h3 className="text-white font-bold text-sm leading-tight line-clamp-1">
+            <h3 className="text-white font-bold text-sm leading-tight line-clamp-2">
               {displayName}
             </h3>
-            {coral.common_name_ja && coral.common_name_en && (
-              <p className="text-slate-400 text-xs mt-0.5 line-clamp-1">{coral.common_name_en}</p>
+            {coral.common_name && (
+              <p className="text-slate-400 text-xs mt-0.5 line-clamp-1">{coral.common_name}</p>
             )}
-            <p className="text-slate-500 text-xs italic mt-0.5 line-clamp-1">{coral.scientific_name}</p>
+            {coral.scientific_name !== displayName && (
+              <p className="text-slate-500 text-xs italic mt-0.5 line-clamp-1">{coral.scientific_name}</p>
+            )}
           </div>
 
           {/* Difficulty */}
           {difficulty && (
             <div>
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${difficulty.color}`}>
-                {difficulty.label}
+                {difficulty.label}（Lv.{coral.difficulty}）
               </span>
             </div>
           )}
 
           {/* Key params */}
-          <div className="mt-auto pt-2 border-t border-slate-700 grid grid-cols-2 gap-x-2 gap-y-1">
+          <div className="mt-auto pt-2 border-t border-slate-700 space-y-1">
             {/* Light */}
-            {light && (
+            {coral.light_min != null && coral.light_max != null ? (
               <div className="flex items-center gap-1">
                 <span className="text-yellow-400 text-xs">💡</span>
-                <span className="text-slate-300 text-xs font-medium">光量</span>
-                <span className="text-yellow-300 text-xs font-bold ml-auto">{light.label}</span>
+                <span className="text-slate-300 text-xs">光量</span>
+                <span className="text-yellow-300 text-xs font-bold ml-auto">{coral.light_min}–{coral.light_max} PAR</span>
               </div>
-            )}
+            ) : null}
             {/* KH */}
             {coral.kh_min != null && coral.kh_max != null ? (
               <div className="flex items-center gap-1">
                 <span className="text-blue-400 text-xs">⚗️</span>
-                <span className="text-slate-300 text-xs font-medium">KH</span>
-                <span className="text-blue-300 text-xs font-bold ml-auto">{coral.kh_min}–{coral.kh_max}</span>
-              </div>
-            ) : coral.ph_min != null && coral.ph_max != null ? (
-              <div className="flex items-center gap-1">
-                <span className="text-blue-400 text-xs">🔬</span>
-                <span className="text-slate-300 text-xs font-medium">pH</span>
-                <span className="text-blue-300 text-xs font-bold ml-auto">{coral.ph_min}–{coral.ph_max}</span>
+                <span className="text-slate-300 text-xs">KH</span>
+                <span className="text-blue-300 text-xs font-bold ml-auto">{coral.kh_min}–{coral.kh_max} dKH</span>
               </div>
             ) : null}
             {/* Water flow */}
             {coral.flow && (
-              <div className="flex items-center gap-1 col-span-2">
+              <div className="flex items-center gap-1">
                 <span className="text-cyan-400 text-xs">🌊</span>
-                <span className="text-slate-300 text-xs font-medium">水流</span>
+                <span className="text-slate-300 text-xs">水流</span>
                 <span className="text-cyan-300 text-xs font-bold ml-auto">
                   {{ low: '弱', medium: '中', high: '強' }[coral.flow] ?? coral.flow}
                 </span>

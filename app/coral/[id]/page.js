@@ -7,23 +7,11 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import Header from '@/components/Header'
 
-const DIFFICULTY_CONFIG = {
-  beginner:     { label: '初心者向け',  color: 'bg-emerald-900 text-emerald-300' },
-  intermediate: { label: '中級者向け',  color: 'bg-amber-900 text-amber-300' },
-  advanced:     { label: '上級者向け',  color: 'bg-rose-900 text-rose-300' },
-}
-
-const TYPE_CONFIG = {
-  SPS:  { color: 'bg-sky-900 text-sky-300' },
-  LPS:  { color: 'bg-violet-900 text-violet-300' },
-  soft: { label: 'ソフトコーラル', color: 'bg-teal-900 text-teal-300' },
-}
-
-const LIGHT_LABELS = {
-  low:       '低光量 (low)',
-  medium:    '中光量 (medium)',
-  high:      '強光量 (high)',
-  very_high: '超強光量 (very high)',
+function getDifficultyLabel(level) {
+  if (level == null) return null
+  if (level <= 2) return { label: '初心者向け',  color: 'bg-emerald-900 text-emerald-300' }
+  if (level === 3) return { label: '中級者向け',  color: 'bg-amber-900 text-amber-300' }
+  return               { label: '上級者向け',  color: 'bg-rose-900 text-rose-300' }
 }
 
 const FLOW_LABELS = {
@@ -83,9 +71,8 @@ export default function CoralDetail() {
     )
   }
 
-  const difficulty = DIFFICULTY_CONFIG[coral.difficulty]
-  const type = TYPE_CONFIG[coral.coral_type]
-  const displayName = coral.common_name_ja || coral.common_name_en || coral.scientific_name
+  const difficulty = getDifficultyLabel(coral.difficulty)
+  const displayName = coral.species_name || coral.scientific_name
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -125,35 +112,32 @@ export default function CoralDetail() {
             {/* Title & badges */}
             <div>
               <div className="flex flex-wrap gap-2 mb-3">
-                {type && (
-                  <span className={`text-sm font-bold px-3 py-1 rounded-full ${type.color}`}>
-                    {type.label ?? coral.coral_type}
+                {coral.source_type && (
+                  <span className="text-sm px-3 py-1 rounded-full bg-sky-900 text-sky-300">
+                    {coral.source_type}
                   </span>
                 )}
                 {difficulty && (
                   <span className={`text-sm px-3 py-1 rounded-full ${difficulty.color}`}>
-                    {difficulty.label}
+                    {difficulty.label}（Lv.{coral.difficulty}）
                   </span>
                 )}
               </div>
               <h1 className="text-2xl md:text-3xl font-bold text-white">{displayName}</h1>
-              {coral.common_name_en && coral.common_name_ja && (
-                <p className="text-blue-300 mt-1">{coral.common_name_en}</p>
+              {coral.common_name && (
+                <p className="text-blue-300 mt-1">{coral.common_name}</p>
               )}
-              <p className="text-slate-400 italic mt-1">{coral.scientific_name}</p>
-              {(coral.family || coral.genus) && (
-                <p className="text-slate-500 text-sm mt-1">
-                  {[coral.family, coral.genus].filter(Boolean).join(' / ')}
-                </p>
+              {coral.scientific_name !== displayName && (
+                <p className="text-slate-400 italic mt-1">{coral.scientific_name}</p>
               )}
             </div>
 
-            {/* Quick params at a glance */}
+            {/* Quick params */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {coral.light_intensity && (
+              {coral.light_min != null && coral.light_max != null && (
                 <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
                   <span className="text-xs text-slate-400 font-medium">💡 推奨光量</span>
-                  <span className="text-white font-bold">{LIGHT_LABELS[coral.light_intensity] ?? coral.light_intensity}</span>
+                  <span className="text-white font-bold">{coral.light_min} – {coral.light_max} PAR</span>
                 </div>
               )}
               {coral.kh_min != null && coral.kh_max != null && (
@@ -168,54 +152,49 @@ export default function CoralDetail() {
                   <span className="text-white font-bold">{FLOW_LABELS[coral.flow] ?? coral.flow}</span>
                 </div>
               )}
-              {coral.water_temp_min != null && coral.water_temp_max != null && (
+              {coral.temp_min != null && coral.temp_max != null && (
                 <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
                   <span className="text-xs text-slate-400 font-medium">🌡️ 水温</span>
-                  <span className="text-white font-bold">{coral.water_temp_min} – {coral.water_temp_max} °C</span>
+                  <span className="text-white font-bold">{coral.temp_min} – {coral.temp_max} °C</span>
                 </div>
               )}
-              {coral.ph_min != null && coral.ph_max != null && (
+              {coral.ca_min != null && coral.ca_max != null && (
                 <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
-                  <span className="text-xs text-slate-400 font-medium">🔬 pH</span>
-                  <span className="text-white font-bold">{coral.ph_min} – {coral.ph_max}</span>
+                  <span className="text-xs text-slate-400 font-medium">🧪 Ca</span>
+                  <span className="text-white font-bold">{coral.ca_min} – {coral.ca_max} ppm</span>
                 </div>
               )}
-              {coral.salinity_min != null && coral.salinity_max != null && (
+              {coral.mg_min != null && coral.mg_max != null && (
                 <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
-                  <span className="text-xs text-slate-400 font-medium">🧂 塩分濃度</span>
-                  <span className="text-white font-bold">{coral.salinity_min} – {coral.salinity_max} ppt</span>
+                  <span className="text-xs text-slate-400 font-medium">🔬 Mg</span>
+                  <span className="text-white font-bold">{coral.mg_min} – {coral.mg_max} ppm</span>
                 </div>
               )}
             </div>
 
-            {/* Distribution */}
-            {(coral.origin_region || coral.distribution) && (
-              <div>
-                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">分布</h2>
-                <p className="text-slate-200">{coral.distribution || coral.origin_region}</p>
-              </div>
-            )}
-
-            {/* Description */}
-            {coral.description && (
+            {/* Summary */}
+            {coral.summary_jp && (
               <div>
                 <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">解説</h2>
-                <p className="text-slate-200 leading-relaxed">{coral.description}</p>
+                <p className="text-slate-200 leading-relaxed">{coral.summary_jp}</p>
               </div>
             )}
 
-            {/* Care notes */}
-            {coral.care_notes && (
+            {/* Additives */}
+            {coral.additives && (
               <div>
-                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">飼育メモ</h2>
-                <p className="text-slate-200 leading-relaxed">{coral.care_notes}</p>
+                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">添加剤</h2>
+                <p className="text-slate-200 leading-relaxed">{coral.additives}</p>
               </div>
             )}
 
-            {/* Meta */}
-            {(coral.contributed_by || coral.country) && (
-              <div className="pt-4 border-t border-slate-700 text-sm text-slate-500">
-                登録: {[coral.contributed_by, coral.country].filter(Boolean).join(' / ')}
+            {/* Source link */}
+            {coral.source_url && (
+              <div>
+                <a href={coral.source_url} target="_blank" rel="noopener noreferrer"
+                  className="text-sm px-4 py-2 rounded-lg bg-blue-800 hover:bg-blue-700 text-white transition-colors inline-block">
+                  🔗 ソースを開く
+                </a>
               </div>
             )}
 
