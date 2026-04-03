@@ -7,28 +7,47 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import Header from '@/components/Header'
 
-const EVIDENCE_STYLES = {
-  high:   'bg-green-900 text-green-300',
-  medium: 'bg-yellow-900 text-yellow-300',
-  low:    'bg-red-900 text-red-300',
+const DIFFICULTY_CONFIG = {
+  beginner:     { label: '初心者向け',  color: 'bg-emerald-900 text-emerald-300' },
+  intermediate: { label: '中級者向け',  color: 'bg-amber-900 text-amber-300' },
+  advanced:     { label: '上級者向け',  color: 'bg-rose-900 text-rose-300' },
+}
+
+const TYPE_CONFIG = {
+  SPS:  { color: 'bg-sky-900 text-sky-300' },
+  LPS:  { color: 'bg-violet-900 text-violet-300' },
+  soft: { label: 'ソフトコーラル', color: 'bg-teal-900 text-teal-300' },
+}
+
+const LIGHT_LABELS = {
+  low:       '低光量 (low)',
+  medium:    '中光量 (medium)',
+  high:      '強光量 (high)',
+  very_high: '超強光量 (very high)',
+}
+
+const FLOW_LABELS = {
+  low:    '弱 (low)',
+  medium: '中 (medium)',
+  high:   '強 (high)',
 }
 
 export default function CoralDetail() {
   const { id } = useParams()
-  const [record, setRecord]   = useState(null)
+  const [coral, setCoral]   = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
 
   useEffect(() => {
-    async function fetchRecord() {
+    async function fetchCoral() {
       try {
         const { data, error } = await supabase
-          .from('coral_database')
+          .from('coral_encyclopedia')
           .select('*')
           .eq('id', id)
           .single()
         if (error) throw error
-        setRecord(data)
+        setCoral(data)
       } catch (err) {
         setError('データが見つかりませんでした')
         console.error(err)
@@ -36,7 +55,7 @@ export default function CoralDetail() {
         setLoading(false)
       }
     }
-    if (id) fetchRecord()
+    if (id) fetchCoral()
   }, [id])
 
   if (loading) {
@@ -51,7 +70,7 @@ export default function CoralDetail() {
     )
   }
 
-  if (error || !record) {
+  if (error || !coral) {
     return (
       <div className="min-h-screen bg-slate-950">
         <Header />
@@ -64,7 +83,9 @@ export default function CoralDetail() {
     )
   }
 
-  const imageUrl = record.starage_image_url || record.raw_image_url
+  const difficulty = DIFFICULTY_CONFIG[coral.difficulty]
+  const type = TYPE_CONFIG[coral.coral_type]
+  const displayName = coral.common_name_ja || coral.common_name_en || coral.scientific_name
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -83,10 +104,10 @@ export default function CoralDetail() {
 
           {/* Image */}
           <div className="relative h-64 md:h-80 bg-gradient-to-br from-blue-900 to-teal-900">
-            {imageUrl ? (
+            {coral.image_url ? (
               <Image
-                src={imageUrl}
-                alt={record.title ?? ''}
+                src={coral.image_url}
+                alt={displayName ?? ''}
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 896px"
@@ -101,143 +122,100 @@ export default function CoralDetail() {
 
           <div className="p-6 md:p-8 space-y-6">
 
-            {/* Title & Tags */}
+            {/* Title & badges */}
             <div>
-              <h1 className="text-xl md:text-2xl font-bold text-white leading-snug">{record.title}</h1>
-              {record.authors && <p className="text-blue-300 mt-2">{record.authors}</p>}
-              {record.published_date && (
-                <p className="text-slate-400 text-sm mt-1">{record.published_date}</p>
-              )}
-              <div className="flex flex-wrap gap-2 mt-3">
-                {record.source_type && (
-                  <span className="text-sm px-3 py-1 rounded-full bg-purple-900 text-purple-300">
-                    {record.source_type}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {type && (
+                  <span className={`text-sm font-bold px-3 py-1 rounded-full ${type.color}`}>
+                    {type.label ?? coral.coral_type}
                   </span>
                 )}
-                {record.language && (
-                  <span className="text-sm px-3 py-1 rounded-full bg-blue-900 text-blue-300">
-                    {record.language}
-                  </span>
-                )}
-                {record.evidence_level && (
-                  <span className={`text-sm px-3 py-1 rounded-full ${EVIDENCE_STYLES[record.evidence_level] ?? 'bg-gray-700 text-gray-300'}`}>
-                    証拠レベル: {record.evidence_level}
-                  </span>
-                )}
-                {record.value_category && (
-                  <span className="text-sm px-3 py-1 rounded-full bg-teal-900 text-teal-300">
-                    {record.value_category}
+                {difficulty && (
+                  <span className={`text-sm px-3 py-1 rounded-full ${difficulty.color}`}>
+                    {difficulty.label}
                   </span>
                 )}
               </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-white">{displayName}</h1>
+              {coral.common_name_en && coral.common_name_ja && (
+                <p className="text-blue-300 mt-1">{coral.common_name_en}</p>
+              )}
+              <p className="text-slate-400 italic mt-1">{coral.scientific_name}</p>
+              {(coral.family || coral.genus) && (
+                <p className="text-slate-500 text-sm mt-1">
+                  {[coral.family, coral.genus].filter(Boolean).join(' / ')}
+                </p>
+              )}
             </div>
 
-            {/* Links */}
-            {(record.source_url || record.pdf_url) && (
-              <div className="flex flex-wrap gap-3">
-                {record.source_url && (
-                  <a href={record.source_url} target="_blank" rel="noopener noreferrer"
-                    className="text-sm px-4 py-2 rounded-lg bg-blue-800 hover:bg-blue-700 text-white transition-colors">
-                    🔗 ソースを開く
-                  </a>
-                )}
-                {record.pdf_url && (
-                  <a href={record.pdf_url} target="_blank" rel="noopener noreferrer"
-                    className="text-sm px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors">
-                    📄 PDF
-                  </a>
-                )}
-              </div>
-            )}
-
-            {/* Water parameters */}
-            {(record.temp_min != null || record.kh_min != null || record.ca_min != null || record.mg_min != null || record.par_min != null) && (
-              <div>
-                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-3">水質パラメータ</h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {record.temp_min != null && record.temp_max != null && (
-                    <div className="bg-slate-900 rounded-lg p-3">
-                      <div className="text-slate-400 text-xs mb-1">🌡️ 水温</div>
-                      <div className="text-white font-semibold">{record.temp_min}–{record.temp_max}°C</div>
-                    </div>
-                  )}
-                  {record.kh_min != null && record.kh_max != null && (
-                    <div className="bg-slate-900 rounded-lg p-3">
-                      <div className="text-slate-400 text-xs mb-1">⚗️ KH</div>
-                      <div className="text-white font-semibold">{record.kh_min}–{record.kh_max} dKH</div>
-                    </div>
-                  )}
-                  {record.ca_min != null && record.ca_max != null && (
-                    <div className="bg-slate-900 rounded-lg p-3">
-                      <div className="text-slate-400 text-xs mb-1">🧪 Ca</div>
-                      <div className="text-white font-semibold">{record.ca_min}–{record.ca_max} ppm</div>
-                    </div>
-                  )}
-                  {record.mg_min != null && record.mg_max != null && (
-                    <div className="bg-slate-900 rounded-lg p-3">
-                      <div className="text-slate-400 text-xs mb-1">🔬 Mg</div>
-                      <div className="text-white font-semibold">{record.mg_min}–{record.mg_max} ppm</div>
-                    </div>
-                  )}
-                  {record.par_min != null && record.par_max != null && (
-                    <div className="bg-slate-900 rounded-lg p-3">
-                      <div className="text-slate-400 text-xs mb-1">💡 PAR</div>
-                      <div className="text-white font-semibold">{record.par_min}–{record.par_max}</div>
-                    </div>
-                  )}
-                  {record.mention_counts != null && (
-                    <div className="bg-slate-900 rounded-lg p-3">
-                      <div className="text-slate-400 text-xs mb-1">📊 言及数</div>
-                      <div className="text-white font-semibold">{record.mention_counts}</div>
-                    </div>
-                  )}
+            {/* Quick params at a glance */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {coral.light_intensity && (
+                <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                  <span className="text-xs text-slate-400 font-medium">💡 推奨光量</span>
+                  <span className="text-white font-bold">{LIGHT_LABELS[coral.light_intensity] ?? coral.light_intensity}</span>
                 </div>
-              </div>
-            )}
-
-            {/* Trace elements */}
-            {record.trace_elements && (
-              <div>
-                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">微量元素</h2>
-                <p className="text-slate-200 leading-relaxed">{record.trace_elements}</p>
-              </div>
-            )}
-
-            {/* Abstract */}
-            {record.adstract && (
-              <div>
-                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">アブストラクト</h2>
-                <p className="text-slate-200 leading-relaxed">{record.adstract}</p>
-              </div>
-            )}
-
-            {/* Summaries */}
-            {record.summary_jp && (
-              <div>
-                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">要約（日本語）</h2>
-                <p className="text-slate-200 leading-relaxed">{record.summary_jp}</p>
-              </div>
-            )}
-            {record.summary_en && (
-              <div>
-                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">Summary (English)</h2>
-                <p className="text-slate-200 leading-relaxed">{record.summary_en}</p>
-              </div>
-            )}
-            {record.summary_de && (
-              <div>
-                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">Zusammenfassung (Deutsch)</h2>
-                <p className="text-slate-200 leading-relaxed">{record.summary_de}</p>
-              </div>
-            )}
-
-            {/* Metrics */}
-            {(record.sentiment != null || record.trend_score != null) && (
-              <div className="pt-4 border-t border-slate-700">
-                <div className="flex flex-wrap gap-4 text-sm text-slate-400">
-                  {record.sentiment != null && <span>センチメント: {record.sentiment}</span>}
-                  {record.trend_score != null && <span>トレンドスコア: {record.trend_score}</span>}
+              )}
+              {coral.kh_min != null && coral.kh_max != null && (
+                <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                  <span className="text-xs text-slate-400 font-medium">⚗️ 推奨 KH</span>
+                  <span className="text-white font-bold">{coral.kh_min} – {coral.kh_max} dKH</span>
                 </div>
+              )}
+              {coral.flow && (
+                <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                  <span className="text-xs text-slate-400 font-medium">🌊 水流</span>
+                  <span className="text-white font-bold">{FLOW_LABELS[coral.flow] ?? coral.flow}</span>
+                </div>
+              )}
+              {coral.water_temp_min != null && coral.water_temp_max != null && (
+                <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                  <span className="text-xs text-slate-400 font-medium">🌡️ 水温</span>
+                  <span className="text-white font-bold">{coral.water_temp_min} – {coral.water_temp_max} °C</span>
+                </div>
+              )}
+              {coral.ph_min != null && coral.ph_max != null && (
+                <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                  <span className="text-xs text-slate-400 font-medium">🔬 pH</span>
+                  <span className="text-white font-bold">{coral.ph_min} – {coral.ph_max}</span>
+                </div>
+              )}
+              {coral.salinity_min != null && coral.salinity_max != null && (
+                <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                  <span className="text-xs text-slate-400 font-medium">🧂 塩分濃度</span>
+                  <span className="text-white font-bold">{coral.salinity_min} – {coral.salinity_max} ppt</span>
+                </div>
+              )}
+            </div>
+
+            {/* Distribution */}
+            {(coral.origin_region || coral.distribution) && (
+              <div>
+                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">分布</h2>
+                <p className="text-slate-200">{coral.distribution || coral.origin_region}</p>
+              </div>
+            )}
+
+            {/* Description */}
+            {coral.description && (
+              <div>
+                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">解説</h2>
+                <p className="text-slate-200 leading-relaxed">{coral.description}</p>
+              </div>
+            )}
+
+            {/* Care notes */}
+            {coral.care_notes && (
+              <div>
+                <h2 className="text-slate-400 text-xs uppercase tracking-widest mb-2">飼育メモ</h2>
+                <p className="text-slate-200 leading-relaxed">{coral.care_notes}</p>
+              </div>
+            )}
+
+            {/* Meta */}
+            {(coral.contributed_by || coral.country) && (
+              <div className="pt-4 border-t border-slate-700 text-sm text-slate-500">
+                登録: {[coral.contributed_by, coral.country].filter(Boolean).join(' / ')}
               </div>
             )}
 
