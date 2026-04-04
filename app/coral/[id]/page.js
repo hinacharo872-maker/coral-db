@@ -124,11 +124,14 @@ export default function CoralDetail() {
                 )}
               </div>
               <h1 className="text-2xl md:text-3xl font-bold text-white">{displayName}</h1>
+              {coral.common_name_jp && (
+                <p className="text-blue-300 text-lg mt-1">{coral.common_name_jp}</p>
+              )}
               {coral.common_name && (
-                <p className="text-blue-300 mt-1">{coral.common_name}</p>
+                <p className="text-slate-400 mt-0.5">{coral.common_name}</p>
               )}
               {coral.scientific_name !== displayName && (
-                <p className="text-slate-400 italic mt-1">{coral.scientific_name}</p>
+                <p className="text-slate-500 italic mt-0.5">{coral.scientific_name}</p>
               )}
             </div>
 

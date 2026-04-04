@@ -51,6 +51,7 @@ export default function Home() {
       result = result.filter(r =>
         r.species_name?.toLowerCase().includes(q) ||
         r.common_name?.toLowerCase().includes(q) ||
+        r.common_name_jp?.toLowerCase().includes(q) ||
         r.scientific_name?.toLowerCase().includes(q) ||
         r.summary_jp?.toLowerCase().includes(q)
       )
@@ -87,7 +88,7 @@ export default function Home() {
           {/* Search */}
           <input
             type="text"
-            placeholder="サンゴ名・学名・英名で検索..."
+            placeholder="サンゴ名（日本語・英語）・学名で検索..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-blue-800 text-white placeholder-blue-500 focus:outline-none focus:border-blue-400 text-sm"

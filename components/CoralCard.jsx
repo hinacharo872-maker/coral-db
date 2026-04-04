@@ -56,6 +56,9 @@ export default function CoralCard({ coral }) {
             <h3 className="text-white font-bold text-sm leading-tight line-clamp-2">
               {displayName}
             </h3>
+            {coral.common_name_jp && (
+              <p className="text-blue-300 text-xs mt-0.5 line-clamp-1">{coral.common_name_jp}</p>
+            )}
             {coral.common_name && (
               <p className="text-slate-400 text-xs mt-0.5 line-clamp-1">{coral.common_name}</p>
             )}
