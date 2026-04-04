@@ -5,18 +5,10 @@ import { supabase } from '@/lib/supabase'
 import CoralCard from '@/components/CoralCard'
 import Header from '@/components/Header'
 
-const DIFFICULTIES = [
-  { value: '',  label: 'すべて' },
-  { value: '2', label: '初心者 (Lv.1-2)' },
-  { value: '3', label: '中級者 (Lv.3)' },
-  { value: '4', label: '上級者 (Lv.4-5)' },
-]
-
 export default function Home() {
   const [records, setRecords] = useState([])
   const [search, setSearch]   = useState('')
-  const [difficulty, setDifficulty] = useState('')
-  const [sourceType, setSourceType] = useState('')
+  const [category, setCategory] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
 
@@ -24,7 +16,7 @@ export default function Home() {
     async function fetchRecords() {
       try {
         const { data, error } = await supabase
-          .from('coral_encyclopedia')
+          .from('coral_master_list')
           .select('*')
           .order('id', { ascending: true })
         if (error) throw error
@@ -39,8 +31,8 @@ export default function Home() {
     fetchRecords()
   }, [])
 
-  const sourceTypes = useMemo(
-    () => [...new Set(records.map(r => r.source_type).filter(Boolean))],
+  const categories = useMemo(
+    () => [...new Set(records.map(r => r.coral_category).filter(Boolean))].sort(),
     [records]
   )
 
@@ -49,24 +41,17 @@ export default function Home() {
     if (search) {
       const q = search.toLowerCase()
       result = result.filter(r =>
-        r.species_name?.toLowerCase().includes(q) ||
-        r.common_name?.toLowerCase().includes(q) ||
+        r.trade_name?.toLowerCase().includes(q) ||
         r.common_name_jp?.toLowerCase().includes(q) ||
-        r.scientific_name?.toLowerCase().includes(q) ||
-        r.summary_jp?.toLowerCase().includes(q)
+        r.genus?.toLowerCase().includes(q) ||
+        r.species?.toLowerCase().includes(q) ||
+        r.brand_prefix?.toLowerCase().includes(q) ||
+        r.source_shop?.toLowerCase().includes(q)
       )
     }
-    if (difficulty) {
-      const lv = Number(difficulty)
-      result = result.filter(r => {
-        if (lv <= 2) return r.difficulty != null && r.difficulty <= 2
-        if (lv === 3) return r.difficulty === 3
-        return r.difficulty != null && r.difficulty >= 4
-      })
-    }
-    if (sourceType) result = result.filter(r => r.source_type === sourceType)
+    if (category) result = result.filter(r => r.coral_category === category)
     return result
-  }, [search, difficulty, sourceType, records])
+  }, [search, category, records])
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -85,61 +70,42 @@ export default function Home() {
       <div className="bg-blue-950/80 backdrop-blur border-b border-blue-900 py-4 px-4 sticky top-0 z-10 shadow-lg">
         <div className="max-w-6xl mx-auto space-y-3">
 
-          {/* Search */}
           <input
             type="text"
-            placeholder="サンゴ名（日本語・英語）・学名で検索..."
+            placeholder="トレード名・日本語名・属名・ショップ名で検索..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-blue-800 text-white placeholder-blue-500 focus:outline-none focus:border-blue-400 text-sm"
           />
 
-          {/* Tag filters */}
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-slate-400 text-xs font-medium shrink-0">難易度:</span>
-            {DIFFICULTIES.map(d => (
+          {categories.length > 0 && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-slate-400 text-xs font-medium shrink-0">カテゴリ:</span>
               <button
-                key={d.value}
-                onClick={() => setDifficulty(d.value)}
+                onClick={() => setCategory('')}
                 className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                  difficulty === d.value
+                  category === ''
                     ? 'bg-blue-600 border-blue-500 text-white'
                     : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-blue-500 hover:text-white'
                 }`}
               >
-                {d.label}
+                すべて
               </button>
-            ))}
-            {sourceTypes.length > 0 && (
-              <>
-                <span className="text-slate-600 mx-1">|</span>
-                <span className="text-slate-400 text-xs font-medium shrink-0">ソース:</span>
+              {categories.map(c => (
                 <button
-                  onClick={() => setSourceType('')}
+                  key={c}
+                  onClick={() => setCategory(c)}
                   className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                    sourceType === ''
+                    category === c
                       ? 'bg-blue-600 border-blue-500 text-white'
                       : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-blue-500 hover:text-white'
                   }`}
                 >
-                  すべて
+                  {c}
                 </button>
-                {sourceTypes.map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setSourceType(t)}
-                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                      sourceType === t
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-blue-500 hover:text-white'
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -164,7 +130,7 @@ export default function Home() {
             <div className="text-5xl mb-4">🔍</div>
             <p>該当するサンゴが見つかりませんでした</p>
             <button
-              onClick={() => { setSearch(''); setDifficulty(''); setSourceType('') }}
+              onClick={() => { setSearch(''); setCategory('') }}
               className="mt-4 text-sm text-blue-400 hover:text-blue-200 underline"
             >
               フィルターをリセット
