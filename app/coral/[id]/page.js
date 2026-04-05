@@ -7,9 +7,10 @@ import { supabase } from '@/lib/supabase'
 import Header from '@/components/Header'
 
 const CATEGORY_COLORS = {
-  SPS:  'bg-rose-900 text-rose-300',
-  LPS:  'bg-amber-900 text-amber-300',
-  Soft: 'bg-emerald-900 text-emerald-300',
+  SPS:      'bg-rose-900 text-rose-300',
+  LPS:      'bg-amber-900 text-amber-300',
+  Soft:     'bg-emerald-900 text-emerald-300',
+  Zoanthid: 'bg-purple-900 text-purple-300',
 }
 
 export default function CoralDetail() {
@@ -153,6 +154,59 @@ export default function CoralDetail() {
                 </div>
               )}
             </div>
+
+            {/* Water quality */}
+            {(coral.temperature != null || coral.salinity != null || coral.kh != null ||
+              coral.calcium != null || coral.magnesium != null ||
+              coral.nitrate != null || coral.phosphate != null) && (
+              <div>
+                <h2 className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-3">水質パラメータ</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {coral.temperature != null && (
+                    <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                      <span className="text-xs text-slate-400 font-medium">水温</span>
+                      <span className="text-white font-bold">{coral.temperature} °C</span>
+                    </div>
+                  )}
+                  {coral.salinity != null && (
+                    <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                      <span className="text-xs text-slate-400 font-medium">比重</span>
+                      <span className="text-white font-bold">{coral.salinity}</span>
+                    </div>
+                  )}
+                  {coral.kh != null && (
+                    <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                      <span className="text-xs text-slate-400 font-medium">KH</span>
+                      <span className="text-white font-bold">{coral.kh} dKH</span>
+                    </div>
+                  )}
+                  {coral.calcium != null && (
+                    <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                      <span className="text-xs text-slate-400 font-medium">カルシウム</span>
+                      <span className="text-white font-bold">{coral.calcium} ppm</span>
+                    </div>
+                  )}
+                  {coral.magnesium != null && (
+                    <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                      <span className="text-xs text-slate-400 font-medium">マグネシウム</span>
+                      <span className="text-white font-bold">{coral.magnesium} ppm</span>
+                    </div>
+                  )}
+                  {coral.nitrate != null && (
+                    <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                      <span className="text-xs text-slate-400 font-medium">硝酸塩</span>
+                      <span className="text-white font-bold">{coral.nitrate} ppm</span>
+                    </div>
+                  )}
+                  {coral.phosphate != null && (
+                    <div className="bg-slate-900 rounded-xl p-4 flex flex-col gap-1">
+                      <span className="text-xs text-slate-400 font-medium">リン酸塩</span>
+                      <span className="text-white font-bold">{coral.phosphate} ppm</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
           </div>
         </div>

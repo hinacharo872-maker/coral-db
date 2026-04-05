@@ -1,9 +1,10 @@
 import Link from 'next/link'
 
 const CATEGORY_COLORS = {
-  SPS:  'bg-rose-900 text-rose-300 border border-rose-700',
-  LPS:  'bg-amber-900 text-amber-300 border border-amber-700',
-  Soft: 'bg-emerald-900 text-emerald-300 border border-emerald-700',
+  SPS:      'bg-rose-900 text-rose-300 border border-rose-700',
+  LPS:      'bg-amber-900 text-amber-300 border border-amber-700',
+  Soft:     'bg-emerald-900 text-emerald-300 border border-emerald-700',
+  Zoanthid: 'bg-purple-900 text-purple-300 border border-purple-700',
 }
 
 export default function CoralCard({ coral }) {
