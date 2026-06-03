@@ -1,8 +1,8 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'World Coral Database | 世界サンゴデータベース',
-  description: '世界中のサンゴ飼育データを集めた公開データベース',
+  title: 'Aqua Reef Log',
+  description: '海水水槽の水質管理とサンゴデータベースを統合するアクアリウム管理アプリ',
 }
 
 export default function RootLayout({ children }) {
