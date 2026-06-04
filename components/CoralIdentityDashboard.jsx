@@ -85,9 +85,9 @@ export default function CoralIdentityDashboard() {
     setSavingId(entityId)
     setError(null)
     const { error } = await supabase.rpc('review_coral_identity', {
-      target_entity_id: entityId,
-      review_action: action,
-      review_notes: notes[entityId] || null,
+      p_entity_id: entityId,
+      p_action: action,
+      p_notes: notes[entityId] || null,
     })
 
     if (error) {
