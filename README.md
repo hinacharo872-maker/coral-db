@@ -20,32 +20,24 @@ npm run dev
 
 ## Automated production deployment
 
-`main` ブランチへのpushで、GitHub Actionsが次の順番で本番反映します。
+SupabaseとVercelのGitHub統合を使います。GitHub Actions用のトークンやデータベースパスワードは不要です。
 
-1. `supabase/migrations` をSupabaseへ適用
-2. Vercelの本番設定を取得
-3. Next.jsをビルド
-4. Vercel Productionへデプロイ
+Supabase Dashboardの `Project Settings > Integrations > GitHub Integration` で次を設定してください。
 
-GitHubリポジトリの `Settings > Secrets and variables > Actions` に、次のRepository secretsを登録してください。
+- Repository: `hinacharo872-maker/coral-db`
+- Production branch: `main`
+- Working directory: `.`
+- Deploy to production: On
+- Automatic branching: 必要に応じてOn
 
-| Secret | 取得場所 |
-| --- | --- |
-| `SUPABASE_ACCESS_TOKEN` | Supabase Account Settings > Access Tokens |
-| `SUPABASE_DB_PASSWORD` | Supabase Project Settings > Database |
-| `SUPABASE_PROJECT_REF` | Supabase Project Settings > General |
-| `VERCEL_TOKEN` | Vercel Account Settings > Tokens |
-| `VERCEL_ORG_ID` | Vercel Team Settings、または `.vercel/project.json` |
-| `VERCEL_PROJECT_ID` | Vercel Project Settings、または `.vercel/project.json` |
+`main` にpushまたはマージすると、Supabaseが `supabase/migrations` 内の新しいmigrationを本番DBへ自動適用します。
+
+Vercelでは対象プロジェクトの `Settings > Git` で同じGitHubリポジトリと `main` ブランチを接続してください。`main` へのpushでVercel Productionが自動デプロイされます。
 
 Vercelプロジェクト側には、Production環境変数として次を登録してください。
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-GitHub ActionsからVercelをデプロイするため、VercelのGit自動デプロイも有効だと二重デプロイになります。Actionsへ切り替えた後は、Vercel Project SettingsのGit連携を解除してください。
-
-ワークフローは `.github/workflows/deploy-production.yml` にあります。手動実行もGitHub Actions画面の `Run workflow` から可能です。
 
 ## Database migrations
 
