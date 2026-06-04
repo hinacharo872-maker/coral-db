@@ -4,14 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const PARAMETERS = [
-  { key: 'temperature', label: '水温', unit: '°C', min: 24, max: 26.5, step: '0.1' },
-  { key: 'salinity', label: '比重', unit: '', min: 1.024, max: 1.026, step: '0.001' },
-  { key: 'ph', label: 'pH', unit: '', min: 8.0, max: 8.4, step: '0.1' },
-  { key: 'kh', label: 'KH', unit: 'dKH', min: 7.0, max: 9.0, step: '0.1' },
-  { key: 'calcium', label: 'Ca', unit: 'ppm', min: 400, max: 450, step: '1' },
-  { key: 'magnesium', label: 'Mg', unit: 'ppm', min: 1250, max: 1400, step: '1' },
-  { key: 'nitrate', label: 'NO3', unit: 'ppm', min: 0.2, max: 10, step: '0.1' },
-  { key: 'phosphate', label: 'PO4', unit: 'ppm', min: 0.02, max: 0.08, step: '0.01' },
+  { key: 'temperature', label: '水温', unit: '°C', min: 24, max: 26.5, step: '0.1', color: '#22d3ee' },
+  { key: 'salinity', label: '比重', unit: '', min: 1.024, max: 1.026, step: '0.001', color: '#38bdf8' },
+  { key: 'ph', label: 'pH', unit: '', min: 8.0, max: 8.4, step: '0.1', color: '#a78bfa' },
+  { key: 'kh', label: 'KH', unit: 'dKH', min: 7.0, max: 9.0, step: '0.1', color: '#f59e0b' },
+  { key: 'calcium', label: 'Ca', unit: 'ppm', min: 400, max: 450, step: '1', color: '#f472b6' },
+  { key: 'magnesium', label: 'Mg', unit: 'ppm', min: 1250, max: 1400, step: '1', color: '#818cf8' },
+  { key: 'nitrate', label: 'NO3', unit: 'ppm', min: 0.2, max: 10, step: '0.1', color: '#34d399' },
+  { key: 'phosphate', label: 'PO4', unit: 'ppm', min: 0.02, max: 0.08, step: '0.01', color: '#fb7185' },
 ]
 
 const initialForm = {
@@ -46,51 +46,59 @@ function formatValue(value, unit) {
 }
 
 export default function WaterQualityDashboard() {
+  const [session, setSession] = useState(null)
+  const [email, setEmail] = useState('')
+  const [authMessage, setAuthMessage] = useState('')
   const [aquariums, setAquariums] = useState([])
   const [selectedAquariumId, setSelectedAquariumId] = useState('')
   const [records, setRecords] = useState([])
   const [form, setForm] = useState(initialForm)
+  const [chartParameter, setChartParameter] = useState('temperature')
+  const [chartPeriod, setChartPeriod] = useState(7)
+  const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    bootstrap()
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession))
+    return () => listener.subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (session) bootstrap(session.user.id)
+    else {
+      setAquariums([])
+      setRecords([])
+      setSelectedAquariumId('')
+      setLoading(false)
+    }
+  }, [session])
   useEffect(() => {
     if (selectedAquariumId) fetchWaterLogs(selectedAquariumId)
   }, [selectedAquariumId])
 
-  async function bootstrap() {
+  async function bootstrap(userId) {
     setLoading(true)
-    setError(null)
-
     try {
-      const { data, error } = await supabase
-        .from('aquariums')
-        .select('*')
-        .order('created_at', { ascending: true })
-
+      const { data, error } = await supabase.from('aquariums').select('*').order('created_at')
       if (error) throw error
-
       if (data?.length) {
         setAquariums(data)
         setSelectedAquariumId(data[0].id)
-        return
+      } else {
+        const { data: created, error: createError } = await supabase
+          .from('aquariums')
+          .insert({ name: 'Main Reef Tank', user_id: userId })
+          .select('*')
+          .single()
+        if (createError) throw createError
+        setAquariums([created])
+        setSelectedAquariumId(created.id)
       }
-
-      const { data: created, error: createError } = await supabase
-        .from('aquariums')
-        .insert({ name: 'Main Reef Tank', notes: 'Default aquarium created from the app.' })
-        .select('*')
-        .single()
-
-      if (createError) throw createError
-      setAquariums([created])
-      setSelectedAquariumId(created.id)
     } catch (err) {
-      setError('Supabaseの水質管理テーブルに接続できません。aquarium-water-quality.sqlをSQL editorで実行してください。')
+      setError('水槽データを読み込めませんでした。')
       console.error(err)
     } finally {
       setLoading(false)
@@ -98,265 +106,235 @@ export default function WaterQualityDashboard() {
   }
 
   async function fetchWaterLogs(aquariumId) {
-    try {
-      const { data, error } = await supabase
-        .from('water_quality_logs')
-        .select('*')
-        .eq('aquarium_id', aquariumId)
-        .order('measured_at', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(60)
+    const { data, error } = await supabase
+      .from('water_quality_logs')
+      .select('*')
+      .eq('aquarium_id', aquariumId)
+      .order('measured_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(365)
 
-      if (error) throw error
-      setRecords(data ?? [])
-    } catch (err) {
-      setError('水質ログの読み込みに失敗しました。')
-      console.error(err)
-    }
+    if (error) setError('水質ログを読み込めませんでした。')
+    else setRecords(data ?? [])
   }
 
   const selectedAquarium = aquariums.find(aquarium => aquarium.id === selectedAquariumId)
   const latest = records[0]
-
-  const latestScores = useMemo(() => {
-    if (!latest) return []
-    return PARAMETERS.map(parameter => ({
-      ...parameter,
-      value: latest[parameter.key],
-      status: getStatus(parameter, latest[parameter.key]),
-    }))
-  }, [latest])
-
-  const alerts = latestScores.filter(item => item.status.label !== '適正' && item.status.label !== '未入力')
-
-  function updateField(key, value) {
-    setForm(current => ({ ...current, [key]: value }))
-  }
+  const latestScores = useMemo(() => latest ? PARAMETERS.map(parameter => ({
+    ...parameter,
+    value: latest[parameter.key],
+    status: getStatus(parameter, latest[parameter.key]),
+  })) : [], [latest])
 
   async function handleSubmit(event) {
     event.preventDefault()
-    if (!selectedAquariumId) return
-
     setSaving(true)
     setError(null)
+    const payload = { aquarium_id: selectedAquariumId, user_id: session.user.id, measured_at: form.measured_at, notes: form.notes.trim() || null }
+    PARAMETERS.forEach(parameter => { payload[parameter.key] = parseNumber(form[parameter.key]) })
 
-    const payload = {
-      aquarium_id: selectedAquariumId,
-      measured_at: form.measured_at,
-      notes: form.notes.trim() || null,
+    const { data, error } = await supabase.from('water_quality_logs').insert(payload).select('*').single()
+    if (error) {
+      setError('水質ログを保存できませんでした。')
+    } else {
+      setRecords(current => [data, ...current].slice(0, 365))
+      setForm(current => ({ ...initialForm, measured_at: current.measured_at }))
+      setShowForm(false)
     }
-
-    PARAMETERS.forEach(parameter => {
-      payload[parameter.key] = parseNumber(form[parameter.key])
-    })
-
-    try {
-      const { data, error } = await supabase
-        .from('water_quality_logs')
-        .insert(payload)
-        .select('*')
-        .single()
-
-      if (error) throw error
-      setRecords(current => [data, ...current].slice(0, 60))
-      setForm(current => ({ ...initialForm, measured_at: current.measured_at, notes: '' }))
-    } catch (err) {
-      setError('水質ログの保存に失敗しました。RLSポリシーとSupabase設定を確認してください。')
-      console.error(err)
-    } finally {
-      setSaving(false)
-    }
+    setSaving(false)
   }
 
   async function deleteRecord(id) {
-    try {
-      const { error } = await supabase
-        .from('water_quality_logs')
-        .delete()
-        .eq('id', id)
+    const { error } = await supabase.from('water_quality_logs').delete().eq('id', id)
+    if (error) setError('水質ログを削除できませんでした。')
+    else setRecords(current => current.filter(record => record.id !== id))
+  }
 
-      if (error) throw error
-      setRecords(current => current.filter(record => record.id !== id))
-    } catch (err) {
-      setError('水質ログの削除に失敗しました。')
-      console.error(err)
-    }
+  async function sendMagicLink(event) {
+    event.preventDefault()
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } })
+    setAuthMessage(error ? error.message : 'ログインリンクをメールへ送りました。')
+  }
+
+  if (!session) {
+    return (
+      <section className="max-w-md mx-auto py-12">
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
+          <p className="text-cyan-300 text-sm font-semibold">PRIVATE WATER LOG</p>
+          <h2 className="text-2xl font-bold text-white mt-1">水質記録へログイン</h2>
+          <p className="text-sm text-slate-400 mt-2">記録とグラフはアカウントごとに安全に保存されます。</p>
+          <form onSubmit={sendMagicLink} className="mt-5">
+            <input type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="メールアドレス" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+            <button type="submit" className="w-full bg-cyan-400 text-slate-950 font-bold rounded-md py-3 mt-3">ログインリンクを送る</button>
+            {authMessage && <p className="text-xs text-cyan-300 mt-3">{authMessage}</p>}
+          </form>
+        </div>
+      </section>
+    )
   }
 
   return (
-    <section className="space-y-6">
-      {error && (
-        <div className="border border-rose-800 bg-rose-950/50 rounded-lg p-4 text-rose-100 text-sm">
-          {error}
+    <section className="space-y-5 pb-24 md:pb-0">
+      {error && <div className="border border-rose-800 bg-rose-950/50 rounded-lg p-4 text-rose-100 text-sm">{error}</div>}
+
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-cyan-300 font-semibold">DAILY WATER LOG</p>
+          <h2 className="text-2xl font-bold text-white mt-1">{selectedAquarium?.name || '水質管理'}</h2>
         </div>
-      )}
-
-      <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-white">水質ログ</h2>
-              <p className="text-sm text-slate-400 mt-1">測定値をSupabaseに保存し、推奨範囲と照合します。</p>
-            </div>
-            <span className="text-xs text-cyan-200 border border-cyan-800 bg-cyan-950 px-2.5 py-1 rounded-full">
-              Supabase
-            </span>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-3">
-              <label className="block">
-                <span className="text-xs text-slate-400">水槽</span>
-                <select
-                  value={selectedAquariumId}
-                  onChange={event => setSelectedAquariumId(event.target.value)}
-                  className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-white focus:outline-none focus:border-cyan-400"
-                  disabled={loading || aquariums.length === 0}
-                >
-                  {aquariums.map(aquarium => (
-                    <option key={aquarium.id} value={aquarium.id}>{aquarium.name}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="text-xs text-slate-400">測定日</span>
-                <input
-                  type="date"
-                  value={form.measured_at}
-                  onChange={event => updateField('measured_at', event.target.value)}
-                  className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-white focus:outline-none focus:border-cyan-400"
-                  required
-                />
-              </label>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {PARAMETERS.map(parameter => (
-                <label key={parameter.key} className="block">
-                  <span className="text-xs text-slate-400">{parameter.label}</span>
-                  <input
-                    type="number"
-                    step={parameter.step}
-                    value={form[parameter.key]}
-                    onChange={event => updateField(parameter.key, event.target.value)}
-                    className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-white focus:outline-none focus:border-cyan-400"
-                  />
-                  <span className="text-[11px] text-slate-500">
-                    {parameter.min} - {parameter.max} {parameter.unit}
-                  </span>
-                </label>
-              ))}
-            </div>
-
-            <label className="block">
-              <span className="text-xs text-slate-400">メモ</span>
-              <textarea
-                value={form.notes}
-                onChange={event => updateField('notes', event.target.value)}
-                rows={3}
-                placeholder="換水、添加剤、サンゴの開き具合など"
-                className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 resize-none"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={saving || loading || !selectedAquariumId}
-              className="w-full md:w-auto bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-400 text-slate-950 font-bold px-5 py-2.5 rounded-md transition-colors"
-            >
-              {saving ? '保存中...' : '記録する'}
-            </button>
-          </form>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
-          <h2 className="text-xl font-bold text-white">最新ステータス</h2>
-          {loading ? (
-            <p className="text-sm text-slate-400 mt-4">読み込み中...</p>
-          ) : !latest ? (
-            <p className="text-sm text-slate-400 mt-4">
-              {selectedAquarium?.name ?? '水槽'} の記録はまだありません。
-            </p>
-          ) : (
-            <>
-              <p className="text-sm text-slate-400 mt-1">{latest.measured_at} の測定</p>
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                {latestScores.map(item => (
-                  <div key={item.key} className="bg-slate-950 border border-slate-800 rounded-md p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm text-slate-300">{item.label}</span>
-                      <span className={`text-[11px] border px-2 py-0.5 rounded-full ${item.status.className}`}>
-                        {item.status.label}
-                      </span>
-                    </div>
-                    <div className="text-lg font-bold text-white mt-1">{formatValue(item.value, item.unit)}</div>
-                  </div>
-                ))}
-              </div>
-              {alerts.length > 0 && (
-                <div className="mt-4 border border-amber-800 bg-amber-950/50 rounded-md p-3">
-                  <p className="text-sm text-amber-100 font-semibold">調整候補</p>
-                  <p className="text-sm text-amber-200 mt-1">
-                    {alerts.map(alert => `${alert.label}が${alert.status.label}`).join('、')}です。
-                  </p>
-                </div>
-              )}
-            </>
-          )}
+        <div className="flex items-center gap-2">
+          <select value={selectedAquariumId} onChange={event => setSelectedAquariumId(event.target.value)} className="max-w-[140px] bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-white">
+            {aquariums.map(aquarium => <option key={aquarium.id} value={aquarium.id}>{aquarium.name}</option>)}
+          </select>
+          <button type="button" onClick={() => supabase.auth.signOut()} className="text-xs text-slate-500 hover:text-white">退出</button>
         </div>
       </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {latestScores.slice(0, 4).map(item => (
+          <button
+            type="button"
+            key={item.key}
+            onClick={() => setChartParameter(item.key)}
+            className={`text-left bg-slate-900 border rounded-lg p-4 transition-colors ${chartParameter === item.key ? 'border-cyan-500' : 'border-slate-800'}`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-400">{item.label}</span>
+              <span className={`text-[10px] border px-1.5 py-0.5 rounded-full ${item.status.className}`}>{item.status.label}</span>
+            </div>
+            <p className="text-xl font-bold text-white mt-2">{formatValue(item.value, item.unit)}</p>
+          </button>
+        ))}
+      </div>
+
+      <WaterTrendChart
+        records={records}
+        parameterKey={chartParameter}
+        periodDays={chartPeriod}
+        onParameterChange={setChartParameter}
+        onPeriodChange={setChartPeriod}
+      />
 
       <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-4">
-          <h2 className="text-lg font-bold text-white">測定履歴</h2>
-          <span className="text-xs text-slate-500">{records.length} 件</span>
+        <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+          <h3 className="font-bold text-white">最近の記録</h3>
+          <span className="text-xs text-slate-500">{records.length}件</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-slate-950 text-slate-400">
-              <tr>
-                <th className="text-left font-medium px-4 py-3">日付</th>
-                {PARAMETERS.map(parameter => (
-                  <th key={parameter.key} className="text-left font-medium px-3 py-3">{parameter.label}</th>
-                ))}
-                <th className="text-left font-medium px-3 py-3">メモ</th>
-                <th className="px-3 py-3" aria-label="操作" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {records.length === 0 ? (
-                <tr>
-                  <td colSpan={PARAMETERS.length + 3} className="px-4 py-8 text-center text-slate-500">
-                    最初の測定値を記録してください。
-                  </td>
-                </tr>
-              ) : (
-                records.map(record => (
-                  <tr key={record.id} className="text-slate-300">
-                    <td className="px-4 py-3 font-medium text-white">{record.measured_at}</td>
-                    {PARAMETERS.map(parameter => (
-                      <td key={parameter.key} className="px-3 py-3">
-                        {formatValue(record[parameter.key], parameter.unit)}
-                      </td>
-                    ))}
-                    <td className="px-3 py-3 text-slate-400 max-w-[220px] truncate">{record.notes || '-'}</td>
-                    <td className="px-3 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => deleteRecord(record.id)}
-                        className="text-xs text-slate-500 hover:text-rose-300 transition-colors"
-                      >
-                        削除
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="divide-y divide-slate-800">
+          {records.slice(0, 10).map(record => (
+            <div key={record.id} className="px-4 py-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white">{record.measured_at}</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  水温 {formatValue(record.temperature, '°C')} · KH {formatValue(record.kh, 'dKH')} · NO3 {formatValue(record.nitrate, 'ppm')}
+                </p>
+                {record.notes && <p className="text-xs text-slate-500 mt-1 line-clamp-1">{record.notes}</p>}
+              </div>
+              <button type="button" onClick={() => deleteRecord(record.id)} className="text-xs text-slate-500 hover:text-rose-300">削除</button>
+            </div>
+          ))}
+          {!loading && records.length === 0 && <p className="p-8 text-center text-slate-500">最初の測定値を記録してください。</p>}
         </div>
       </div>
+
+      {showForm && <LogForm form={form} saving={saving} setForm={setForm} onSubmit={handleSubmit} onClose={() => setShowForm(false)} />}
+
+      <button
+        type="button"
+        onClick={() => setShowForm(true)}
+        className="fixed z-40 right-4 bottom-5 md:bottom-8 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold rounded-full w-14 h-14 shadow-xl shadow-cyan-950/50 text-2xl"
+        aria-label="水質を記録"
+      >
+        +
+      </button>
     </section>
+  )
+}
+
+function WaterTrendChart({ records, parameterKey, periodDays, onParameterChange, onPeriodChange }) {
+  const parameter = PARAMETERS.find(item => item.key === parameterKey)
+  const points = useMemo(() => {
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - periodDays + 1)
+    return records
+      .filter(record => new Date(`${record.measured_at}T00:00:00`) >= start && record[parameterKey] != null)
+      .map(record => ({ date: record.measured_at, value: Number(record[parameterKey]) }))
+      .reverse()
+  }, [records, parameterKey, periodDays])
+
+  const values = points.map(point => point.value)
+  const minValue = values.length ? Math.min(...values, parameter.min) : parameter.min
+  const maxValue = values.length ? Math.max(...values, parameter.max) : parameter.max
+  const range = maxValue - minValue || 1
+  const x = index => 8 + (index / Math.max(points.length - 1, 1)) * 84
+  const y = value => 88 - ((value - minValue) / range) * 76
+  const path = points.map((point, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(point.value)}`).join(' ')
+  const average = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-500">推移グラフ</p>
+          <h3 className="text-lg font-bold text-white">{parameter.label} <span className="text-sm text-slate-400">{parameter.unit}</span></h3>
+        </div>
+        <div className="flex gap-2">
+          {[7, 30].map(days => (
+            <button key={days} type="button" onClick={() => onPeriodChange(days)} className={`text-xs px-3 py-2 rounded-md border ${periodDays === days ? 'border-cyan-500 bg-cyan-950 text-cyan-200' : 'border-slate-700 text-slate-400'}`}>
+              {days === 7 ? '週間' : '月間'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto py-3">
+        {PARAMETERS.map(item => (
+          <button key={item.key} type="button" onClick={() => onParameterChange(item.key)} className={`shrink-0 text-xs px-3 py-1.5 rounded-full border ${parameterKey === item.key ? 'border-cyan-500 text-cyan-200 bg-cyan-950' : 'border-slate-700 text-slate-400'}`}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="aspect-[16/8] min-h-[190px]">
+        {points.length ? (
+          <svg viewBox="0 0 100 100" className="w-full h-full" role="img" aria-label={`${parameter.label}の推移`}>
+            <rect x="8" y={y(parameter.max)} width="84" height={Math.max(y(parameter.min) - y(parameter.max), 1)} fill="#064e3b" opacity="0.35" />
+            {[0, 1, 2, 3, 4].map(index => <line key={index} x1="8" x2="92" y1={12 + index * 19} y2={12 + index * 19} stroke="#334155" strokeWidth="0.3" />)}
+            <path d={path} fill="none" stroke={parameter.color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            {points.map((point, index) => <circle key={`${point.date}-${index}`} cx={x(index)} cy={y(point.value)} r="1.8" fill={parameter.color} />)}
+          </svg>
+        ) : <div className="h-full flex items-center justify-center text-sm text-slate-500">この期間の記録はありません。</div>}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mt-2">
+        <Stat label="平均" value={average} unit={parameter.unit} />
+        <Stat label="最小" value={values.length ? Math.min(...values) : null} unit={parameter.unit} />
+        <Stat label="最大" value={values.length ? Math.max(...values) : null} unit={parameter.unit} />
+      </div>
+    </div>
+  )
+}
+
+function Stat({ label, value, unit }) {
+  return <div className="bg-slate-950 border border-slate-800 rounded-md p-3"><p className="text-[11px] text-slate-500">{label}</p><p className="text-sm font-bold text-white mt-1">{value == null ? '-' : `${Number(value.toFixed(3))} ${unit}`}</p></div>
+}
+
+function LogForm({ form, saving, setForm, onSubmit, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end md:items-center justify-center" onClick={onClose}>
+      <form onSubmit={onSubmit} onClick={event => event.stopPropagation()} className="bg-slate-900 border border-slate-700 rounded-t-lg md:rounded-lg p-5 w-full md:max-w-2xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-white">今日の水質を記録</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 text-xl" aria-label="閉じる">×</button>
+        </div>
+        <label className="block mt-4"><span className="text-xs text-slate-400">測定日</span><input type="date" value={form.measured_at} onChange={event => setForm(current => ({ ...current, measured_at: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          {PARAMETERS.map(parameter => <label key={parameter.key}><span className="text-xs text-slate-400">{parameter.label} {parameter.unit}</span><input type="number" inputMode="decimal" step={parameter.step} value={form[parameter.key]} onChange={event => setForm(current => ({ ...current, [parameter.key]: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>)}
+        </div>
+        <label className="block mt-4"><span className="text-xs text-slate-400">メモ</span><textarea rows={3} value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white resize-none" placeholder="換水、添加剤、生体の様子など" /></label>
+        <button type="submit" disabled={saving} className="w-full bg-cyan-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-3 mt-5">{saving ? '保存中...' : '記録する'}</button>
+      </form>
+    </div>
   )
 }
