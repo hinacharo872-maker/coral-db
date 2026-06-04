@@ -4,6 +4,11 @@ node_modules/
 # Next.js
 .next/
 out/
+.vercel/
+
+# Supabase CLI
+supabase/.branches/
+supabase/.temp/
 
 # environment variables
 .env
