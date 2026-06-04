@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import CoralCard from '@/components/CoralCard'
+import CoralIdentityDashboard from '@/components/CoralIdentityDashboard'
 import CoralQualityDashboard from '@/components/CoralQualityDashboard'
 import Header from '@/components/Header'
 import WaterQualityDashboard from '@/components/WaterQualityDashboard'
@@ -10,6 +11,7 @@ import WaterQualityDashboard from '@/components/WaterQualityDashboard'
 const TABS = [
   { id: 'water', label: '水質管理' },
   { id: 'coral', label: 'サンゴDB' },
+  { id: 'identity', label: 'DB整理' },
   { id: 'quality', label: 'DB品質' },
 ]
 
@@ -109,6 +111,7 @@ export default function Home() {
         </div>
 
         {activeView === 'water' && <WaterQualityDashboard />}
+        {activeView === 'identity' && <CoralIdentityDashboard />}
         {activeView === 'quality' && <CoralQualityDashboard />}
         {activeView === 'coral' && (
           <CoralBrowser
