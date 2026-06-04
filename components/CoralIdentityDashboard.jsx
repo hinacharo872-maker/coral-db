@@ -96,34 +96,41 @@ export default function CoralIdentityDashboard() {
     if (error) {
       setError(`レビューの保存に失敗しました: ${error.message}`)
     } else {
-      setGroups(current => (
-        mode === 'pending'
-          ? current.filter(group => group.entity_id !== entityId)
-          : current.map(group => group.entity_id === entityId ? { ...group, review_status: action } : group)
-      ))
-      setSummary(current => {
-        if (!current) return current
-        const next = { ...current }
-        const sourceKey = previousStatus === 'confirmed'
-          ? 'confirmed_groups'
-          : previousStatus === 'needs_split'
-            ? 'split_groups'
-            : previousStatus === 'rejected'
-              ? 'rejected_groups'
-              : 'pending_groups'
-        const targetKey = action === 'confirmed'
-          ? 'confirmed_groups'
-          : action === 'needs_split'
-            ? 'split_groups'
-            : action === 'rejected'
-              ? 'rejected_groups'
-              : 'pending_groups'
-        if (sourceKey !== targetKey) {
-          if (next[sourceKey] > 0) next[sourceKey] -= 1
-          next[targetKey] += 1
-        }
-        return next
-      })
+      const shouldLoadNextBatch = mode === 'pending' && groups.length <= 1
+      if (shouldLoadNextBatch) {
+        await fetchCandidates()
+      } else {
+        setGroups(current => (
+          mode === 'pending'
+            ? current.filter(group => group.entity_id !== entityId)
+            : current.map(group => group.entity_id === entityId ? { ...group, review_status: action } : group)
+        ))
+      }
+      if (!shouldLoadNextBatch) {
+        setSummary(current => {
+          if (!current) return current
+          const next = { ...current }
+          const sourceKey = previousStatus === 'confirmed'
+            ? 'confirmed_groups'
+            : previousStatus === 'needs_split'
+              ? 'split_groups'
+              : previousStatus === 'rejected'
+                ? 'rejected_groups'
+                : 'pending_groups'
+          const targetKey = action === 'confirmed'
+            ? 'confirmed_groups'
+            : action === 'needs_split'
+              ? 'split_groups'
+              : action === 'rejected'
+                ? 'rejected_groups'
+                : 'pending_groups'
+          if (sourceKey !== targetKey) {
+            if (next[sourceKey] > 0) next[sourceKey] -= 1
+            next[targetKey] += 1
+          }
+          return next
+        })
+      }
       setNotes(current => ({ ...current, [entityId]: '' }))
     }
     setSavingId(null)
@@ -273,7 +280,22 @@ export default function CoralIdentityDashboard() {
 
         {!loading && groups.length === 0 && (
           <div className="py-12 text-center text-slate-500">
-            {mode === 'pending' ? '未確認の候補はありません。レビュー完了です。' : 'この条件の候補はありません。'}
+            {mode === 'pending' && summary.pending_groups > 0 ? (
+              <>
+                <p>次の候補を読み込んでください。</p>
+                <button
+                  type="button"
+                  onClick={fetchCandidates}
+                  className="mt-3 border border-cyan-700 text-cyan-200 rounded-md px-4 py-2 hover:bg-cyan-950"
+                >
+                  次の候補を読み込む
+                </button>
+              </>
+            ) : mode === 'pending' ? (
+              '未確認の候補はありません。レビュー完了です。'
+            ) : (
+              'この条件の候補はありません。'
+            )}
           </div>
         )}
       </div>
