@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 export default function CoralIdentityDashboard() {
   const [summary, setSummary] = useState(null)
   const [groups, setGroups] = useState([])
-  const [mode, setMode] = useState('all')
+  const [mode, setMode] = useState('pending')
   const [session, setSession] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [email, setEmail] = useState('')
@@ -44,18 +44,20 @@ export default function CoralIdentityDashboard() {
     setLoading(true)
     setError(null)
     try {
-      let query = supabase
-        .from('coral_identity_candidates')
-        .select('*')
-        .order('listing_count', { ascending: false })
-        .limit(50)
+        let query = supabase
+          .from('coral_identity_candidates')
+          .select('*')
+          .order('listing_count', { ascending: false })
+          .limit(50)
 
+      if (mode === 'pending') query = query.eq('review_status', 'candidate')
+      if (mode === 'confirmed') query = query.eq('review_status', 'confirmed')
       if (mode === 'shops') query = query.gt('shop_count', 1)
       if (mode === 'sizes') query = query.gt('sized_listing_count', 0)
       if (mode === 'conflicts') query = query.or('genus_conflict.eq.true,category_conflict.eq.true')
 
       const [summaryResult, groupResult] = await Promise.all([
-        supabase.from('coral_identity_summary').select('*').single(),
+        supabase.from('coral_identity_review_summary').select('*').single(),
         query,
       ])
 
@@ -84,6 +86,7 @@ export default function CoralIdentityDashboard() {
   async function reviewGroup(entityId, action) {
     setSavingId(entityId)
     setError(null)
+    const previousStatus = groups.find(group => group.entity_id === entityId)?.review_status ?? 'candidate'
     const { error } = await supabase.rpc('review_coral_identity', {
       p_entity_id: entityId,
       p_action: action,
@@ -93,9 +96,34 @@ export default function CoralIdentityDashboard() {
     if (error) {
       setError(`レビューの保存に失敗しました: ${error.message}`)
     } else {
-      setGroups(current => current.map(group => (
-        group.entity_id === entityId ? { ...group, review_status: action } : group
-      )))
+      setGroups(current => (
+        mode === 'pending'
+          ? current.filter(group => group.entity_id !== entityId)
+          : current.map(group => group.entity_id === entityId ? { ...group, review_status: action } : group)
+      ))
+      setSummary(current => {
+        if (!current) return current
+        const next = { ...current }
+        const sourceKey = previousStatus === 'confirmed'
+          ? 'confirmed_groups'
+          : previousStatus === 'needs_split'
+            ? 'split_groups'
+            : previousStatus === 'rejected'
+              ? 'rejected_groups'
+              : 'pending_groups'
+        const targetKey = action === 'confirmed'
+          ? 'confirmed_groups'
+          : action === 'needs_split'
+            ? 'split_groups'
+            : action === 'rejected'
+              ? 'rejected_groups'
+              : 'pending_groups'
+        if (sourceKey !== targetKey) {
+          if (next[sourceKey] > 0) next[sourceKey] -= 1
+          next[targetKey] += 1
+        }
+        return next
+      })
       setNotes(current => ({ ...current, [entityId]: '' }))
     }
     setSavingId(null)
@@ -105,12 +133,12 @@ export default function CoralIdentityDashboard() {
   if (error || !summary) return <div className="border border-rose-800 bg-rose-950/50 rounded-lg p-4 text-rose-100">{error}</div>
 
   const metrics = [
-    { label: '元の商品掲載', value: summary.total_listings },
-    { label: 'サンゴ実体候補', value: summary.candidate_entities },
-    { label: '重複候補グループ', value: summary.duplicate_candidate_groups },
-    { label: '複数ショップ掲載', value: summary.cross_shop_groups },
-    { label: 'サイズ違い掲載', value: summary.size_variant_groups },
-    { label: 'サンゴ以外の疑い', value: summary.non_coral_candidates },
+    { label: '未確認', value: summary.pending_groups },
+    { label: '同一確定', value: summary.confirmed_groups },
+    { label: '要分割', value: summary.split_groups },
+    { label: '除外', value: summary.rejected_groups },
+    { label: 'レビュー対象', value: summary.total_review_groups },
+    { label: '完了率', value: `${Math.round(((summary.total_review_groups - summary.pending_groups) / summary.total_review_groups) * 100)}%`, formatted: true },
   ]
 
   return (
@@ -140,12 +168,16 @@ export default function CoralIdentityDashboard() {
         {metrics.map(metric => (
           <div key={metric.label} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
             <p className="text-xs text-slate-400">{metric.label}</p>
-            <p className="text-2xl font-bold text-white mt-1">{metric.value.toLocaleString('ja-JP')}</p>
+            <p className="text-2xl font-bold text-white mt-1">
+              {metric.formatted ? metric.value : metric.value.toLocaleString('ja-JP')}
+            </p>
           </div>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-4">
+        <ModeButton active={mode === 'pending'} onClick={() => setMode('pending')}>未確認</ModeButton>
+        <ModeButton active={mode === 'confirmed'} onClick={() => setMode('confirmed')}>同一確定済み</ModeButton>
         <ModeButton active={mode === 'all'} onClick={() => setMode('all')}>すべて</ModeButton>
         <ModeButton active={mode === 'shops'} onClick={() => setMode('shops')}>複数ショップ</ModeButton>
         <ModeButton active={mode === 'sizes'} onClick={() => setMode('sizes')}>サイズ違い</ModeButton>
@@ -240,7 +272,9 @@ export default function CoralIdentityDashboard() {
         ))}
 
         {!loading && groups.length === 0 && (
-          <div className="py-12 text-center text-slate-500">この条件の候補はありません。</div>
+          <div className="py-12 text-center text-slate-500">
+            {mode === 'pending' ? '未確認の候補はありません。レビュー完了です。' : 'この条件の候補はありません。'}
+          </div>
         )}
       </div>
     </section>
