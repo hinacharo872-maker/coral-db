@@ -28,7 +28,7 @@ export default function Home() {
     async function fetchRecords() {
       try {
         const { data, count, error } = await supabase
-          .from('coral_master_list')
+          .from('curated_coral_catalog')
           .select('*', { count: 'exact' })
           .order('id', { ascending: true })
           .limit(1000)
