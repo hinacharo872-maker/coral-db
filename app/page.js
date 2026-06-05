@@ -8,6 +8,7 @@ import CoralIdentityDashboard from '@/components/CoralIdentityDashboard'
 import CoralQualityDashboard from '@/components/CoralQualityDashboard'
 import Header from '@/components/Header'
 import WaterQualityDashboard from '@/components/WaterQualityDashboard'
+import { useCoralWaterMatch } from '@/hooks/useCoralWaterMatch'
 
 const LANGUAGES = [
   { code: 'ja', label: '日本語' },
@@ -113,8 +114,10 @@ export default function Home() {
   const [category, setCategory] = useState('')
   const [activeView, setActiveView] = useState('water')
   const [locale, setLocale] = useState('ja')
+  const [compatibleOnly, setCompatibleOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const coralMatch = useCoralWaterMatch()
   const text = PAGE_TEXT[locale] || PAGE_TEXT.ja
   const numberLocale = NUMBER_LOCALE[locale] || 'ja-JP'
 
@@ -131,6 +134,12 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.lang = locale === 'zh' ? 'zh-CN' : locale
   }, [locale])
+
+  useEffect(() => {
+    if ((coralMatch.isDemo || coralMatch.matches.length === 0) && compatibleOnly) {
+      setCompatibleOnly(false)
+    }
+  }, [coralMatch.isDemo, coralMatch.matches.length, compatibleOnly])
 
   useEffect(() => {
     async function fetchRecords() {
@@ -174,8 +183,21 @@ export default function Home() {
       )
     }
     if (category) result = result.filter(record => record.coral_category === category)
+    result = result.map(record => ({
+      ...record,
+      waterMatch: coralMatch.matchByEntityId.get(record.entity_id) ?? null,
+    }))
+    if (compatibleOnly) result = result.filter(record => record.waterMatch?.is_compatible)
+    if (!coralMatch.isDemo && coralMatch.matches.length > 0) {
+      result = [...result].sort((a, b) => {
+        const aRisk = a.waterMatch?.risk_count ?? 999
+        const bRisk = b.waterMatch?.risk_count ?? 999
+        if (aRisk !== bRisk) return aRisk - bRisk
+        return (a.trade_name ?? '').localeCompare(b.trade_name ?? '')
+      })
+    }
     return result
-  }, [search, category, records])
+  }, [search, category, records, compatibleOnly, coralMatch.matchByEntityId, coralMatch.matches.length, coralMatch.isDemo])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -243,8 +265,11 @@ export default function Home() {
             totalCount={totalCount}
             text={text}
             numberLocale={numberLocale}
+            coralMatch={coralMatch}
+            compatibleOnly={compatibleOnly}
             setCategory={setCategory}
             setSearch={setSearch}
+            setCompatibleOnly={setCompatibleOnly}
           />
         )}
       </main>
@@ -272,9 +297,14 @@ function CoralBrowser({
   totalCount,
   text,
   numberLocale,
+  coralMatch,
+  compatibleOnly,
   setCategory,
   setSearch,
+  setCompatibleOnly,
 }) {
+  const canUseMatchFilter = !coralMatch.isDemo && coralMatch.matches.length > 0
+
   return (
     <section>
       <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 mb-5 space-y-3">
@@ -297,6 +327,27 @@ function CoralBrowser({
             ))}
           </div>
         )}
+
+        <div className="flex flex-col gap-2 border-t border-slate-800 pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <label className={`flex items-center gap-3 text-sm ${canUseMatchFilter ? 'text-slate-100' : 'text-slate-500'}`}>
+            <input
+              type="checkbox"
+              checked={compatibleOnly}
+              disabled={!canUseMatchFilter}
+              onChange={event => setCompatibleOnly(event.target.checked)}
+              className="h-5 w-5 rounded border-slate-600 bg-slate-950 text-cyan-500 focus:ring-cyan-500"
+            />
+            <span>現在のあなたの水質で飼育可能</span>
+          </label>
+          <div className="text-xs text-slate-400">
+            {coralMatch.loading && !coralMatch.isDemo && '水質との相性を確認中...'}
+            {coralMatch.error && <span className="text-rose-300">{coralMatch.error}</span>}
+            {coralMatch.message && <span>{coralMatch.message}</span>}
+            {!coralMatch.loading && !coralMatch.error && canUseMatchFilter && (
+              <span>リスクが少ない順に表示しています。</span>
+            )}
+          </div>
+        </div>
       </div>
 
       {loading && <div className="text-center py-20 text-cyan-300">{text.loading}</div>}
@@ -321,7 +372,7 @@ function CoralBrowser({
             {text.showing(totalCount.toLocaleString(numberLocale), records.length.toLocaleString(numberLocale), filtered.length.toLocaleString(numberLocale))}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {filtered.map(coral => <CoralCard key={coral.id} coral={coral} />)}
+            {filtered.map(coral => <CoralCard key={coral.id} coral={coral} match={coral.waterMatch} />)}
           </div>
         </>
       )}
