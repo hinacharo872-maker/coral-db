@@ -287,6 +287,12 @@ function WaterLogForm({ form, setForm, saving, onSubmit }) {
 }
 
 function AdditiveDoseForm({ additives, form, setForm, saving, onSubmit }) {
+  const groupedAdditives = additives.reduce((groups, product) => {
+    if (!groups[product.brand]) groups[product.brand] = []
+    groups[product.brand].push(product)
+    return groups
+  }, {})
+
   return (
     <form onSubmit={onSubmit} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
@@ -304,7 +310,11 @@ function AdditiveDoseForm({ additives, form, setForm, saving, onSubmit }) {
             }}
             className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white"
           >
-            {additives.map(product => <option key={product.id} value={product.id}>{product.brand} - {product.name}</option>)}
+            {Object.entries(groupedAdditives).map(([brand, products]) => (
+              <optgroup key={brand} label={brand}>
+                {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+              </optgroup>
+            ))}
           </select>
         </label>
         <label>
