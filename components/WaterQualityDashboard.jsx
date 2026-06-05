@@ -29,9 +29,25 @@ const initialWaterForm = {
 
 const initialDoseForm = {
   dosed_at: todayIso(),
+  additive_inventory_id: '',
   additive_product_id: '',
   amount: '',
   unit: 'ml',
+  notes: '',
+}
+
+const initialInventoryForm = {
+  additive_product_id: '',
+  initial_amount: '',
+  remaining_amount: '',
+  unit: 'ml',
+  low_stock_threshold: '50',
+  notes: '',
+}
+
+const initialWaterChangeForm = {
+  changed_at: todayIso(),
+  amount_liters: '',
   notes: '',
 }
 
@@ -52,6 +68,11 @@ function formatValue(value, unit) {
   return `${Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 3 })}${unit ? ` ${unit}` : ''}`
 }
 
+function productLabel(product) {
+  if (!product) return ''
+  return `${product.brand} ${product.name}`
+}
+
 export default function WaterQualityDashboard() {
   const [session, setSession] = useState(null)
   const [email, setEmail] = useState('')
@@ -60,12 +81,19 @@ export default function WaterQualityDashboard() {
   const [selectedAquariumId, setSelectedAquariumId] = useState('')
   const [records, setRecords] = useState([])
   const [additives, setAdditives] = useState([])
+  const [inventory, setInventory] = useState([])
   const [doseLogs, setDoseLogs] = useState([])
+  const [waterChanges, setWaterChanges] = useState([])
   const [waterForm, setWaterForm] = useState(initialWaterForm)
   const [doseForm, setDoseForm] = useState(initialDoseForm)
+  const [inventoryForm, setInventoryForm] = useState(initialInventoryForm)
+  const [waterChangeForm, setWaterChangeForm] = useState(initialWaterChangeForm)
   const [periodDays, setPeriodDays] = useState(7)
   const [savingWater, setSavingWater] = useState(false)
   const [savingDose, setSavingDose] = useState(false)
+  const [savingInventory, setSavingInventory] = useState(false)
+  const [savingTank, setSavingTank] = useState(false)
+  const [savingWaterChange, setSavingWaterChange] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -81,7 +109,9 @@ export default function WaterQualityDashboard() {
     else {
       setAquariums([])
       setRecords([])
+      setInventory([])
       setDoseLogs([])
+      setWaterChanges([])
       setSelectedAquariumId('')
       setLoading(false)
     }
@@ -90,7 +120,9 @@ export default function WaterQualityDashboard() {
   useEffect(() => {
     if (selectedAquariumId) {
       fetchWaterLogs(selectedAquariumId)
+      fetchInventory(selectedAquariumId)
       fetchDoseLogs(selectedAquariumId)
+      fetchWaterChanges(selectedAquariumId)
     }
   }, [selectedAquariumId])
 
@@ -99,9 +131,8 @@ export default function WaterQualityDashboard() {
     if (error) return
     setAdditives(data ?? [])
     if (data?.length) {
-      setDoseForm(current => (
-        current.additive_product_id ? current : { ...current, additive_product_id: data[0].id, unit: data[0].default_unit }
-      ))
+      setDoseForm(current => current.additive_product_id ? current : { ...current, additive_product_id: data[0].id, unit: data[0].default_unit })
+      setInventoryForm(current => current.additive_product_id ? current : { ...current, additive_product_id: data[0].id, unit: data[0].default_unit })
     }
   }
 
@@ -117,7 +148,7 @@ export default function WaterQualityDashboard() {
       } else {
         const { data: created, error: createError } = await supabase
           .from('aquariums')
-          .insert({ name: 'Main Reef Tank', user_id: userId })
+          .insert({ name: 'Main Reef Tank', user_id: userId, volume_liters: 100 })
           .select('*')
           .single()
         if (createError) throw createError
@@ -145,10 +176,22 @@ export default function WaterQualityDashboard() {
     else setRecords(data ?? [])
   }
 
+  async function fetchInventory(aquariumId) {
+    const { data, error } = await supabase
+      .from('additive_inventory')
+      .select('*, additive_products(*)')
+      .eq('aquarium_id', aquariumId)
+      .is('archived_at', null)
+      .order('created_at', { ascending: false })
+
+    if (error) setError('添加剤の在庫を読み込めませんでした。')
+    else setInventory(data ?? [])
+  }
+
   async function fetchDoseLogs(aquariumId) {
     const { data, error } = await supabase
       .from('additive_dose_logs')
-      .select('*, additive_products(*)')
+      .select('*, additive_products(*), additive_inventory(*)')
       .eq('aquarium_id', aquariumId)
       .order('dosed_at', { ascending: false })
       .order('created_at', { ascending: false })
@@ -158,10 +201,38 @@ export default function WaterQualityDashboard() {
     else setDoseLogs(data ?? [])
   }
 
+  async function fetchWaterChanges(aquariumId) {
+    const { data, error } = await supabase
+      .from('water_change_logs')
+      .select('*')
+      .eq('aquarium_id', aquariumId)
+      .order('changed_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (error) setError('水換え履歴を読み込めませんでした。')
+    else setWaterChanges(data ?? [])
+  }
+
   async function sendMagicLink(event) {
     event.preventDefault()
     const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } })
     setAuthMessage(error ? error.message : 'ログインリンクをメールへ送りました。')
+  }
+
+  async function saveTankVolume(volumeLiters) {
+    setSavingTank(true)
+    setError(null)
+    const { data, error } = await supabase
+      .from('aquariums')
+      .update({ volume_liters: parseNumber(volumeLiters) })
+      .eq('id', selectedAquariumId)
+      .select('*')
+      .single()
+
+    if (error) setError('水槽データを保存できませんでした。')
+    else setAquariums(current => current.map(item => item.id === data.id ? data : item))
+    setSavingTank(false)
   }
 
   async function saveWaterLog(event) {
@@ -180,41 +251,135 @@ export default function WaterQualityDashboard() {
     setSavingWater(false)
   }
 
+  async function saveInventory(event) {
+    event.preventDefault()
+    setSavingInventory(true)
+    setError(null)
+    const product = additives.find(item => item.id === inventoryForm.additive_product_id)
+    const initialAmount = parseNumber(inventoryForm.initial_amount)
+    const remainingAmount = parseNumber(inventoryForm.remaining_amount) ?? initialAmount
+    const payload = {
+      aquarium_id: selectedAquariumId,
+      user_id: session.user.id,
+      additive_product_id: inventoryForm.additive_product_id,
+      initial_amount: initialAmount,
+      remaining_amount: remainingAmount,
+      unit: inventoryForm.unit || product?.default_unit || 'ml',
+      low_stock_threshold: parseNumber(inventoryForm.low_stock_threshold) ?? 0,
+      notes: inventoryForm.notes.trim() || null,
+    }
+    const { data, error } = await supabase.from('additive_inventory').insert(payload).select('*, additive_products(*)').single()
+
+    if (error) setError('持っている添加剤を登録できませんでした。')
+    else {
+      setInventory(current => [data, ...current])
+      setInventoryForm(current => ({
+        ...initialInventoryForm,
+        additive_product_id: current.additive_product_id,
+        unit: current.unit,
+        low_stock_threshold: current.low_stock_threshold,
+      }))
+    }
+    setSavingInventory(false)
+  }
+
+  async function archiveInventory(id) {
+    const { data, error } = await supabase
+      .from('additive_inventory')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id')
+      .single()
+
+    if (error) setError('添加剤を一覧から外せませんでした。')
+    else setInventory(current => current.filter(item => item.id !== data.id))
+  }
+
   async function saveDoseLog(event) {
     event.preventDefault()
     setSavingDose(true)
     setError(null)
-    const product = additives.find(item => item.id === doseForm.additive_product_id)
+    const selectedInventory = inventory.find(item => item.id === doseForm.additive_inventory_id)
+    const productId = selectedInventory?.additive_product_id || doseForm.additive_product_id
+    const product = additives.find(item => item.id === productId)
+    const amount = parseNumber(doseForm.amount)
+    const unit = selectedInventory?.unit || doseForm.unit || product?.default_unit || 'ml'
     const payload = {
       aquarium_id: selectedAquariumId,
       user_id: session.user.id,
-      additive_product_id: doseForm.additive_product_id,
+      additive_product_id: productId,
+      additive_inventory_id: selectedInventory?.id || null,
       dosed_at: doseForm.dosed_at,
-      amount: parseNumber(doseForm.amount),
-      unit: doseForm.unit || product?.default_unit || 'ml',
+      amount,
+      unit,
       notes: doseForm.notes.trim() || null,
     }
-    const { data, error } = await supabase.from('additive_dose_logs').insert(payload).select('*, additive_products(*)').single()
+    const { data, error } = await supabase.from('additive_dose_logs').insert(payload).select('*, additive_products(*), additive_inventory(*)').single()
 
-    if (error) setError('添加ログを保存できませんでした。')
-    else {
-      setDoseLogs(current => [data, ...current].slice(0, 365))
-      setDoseForm(current => ({ ...initialDoseForm, dosed_at: current.dosed_at, additive_product_id: current.additive_product_id, unit: current.unit }))
+    if (error) {
+      setError('添加ログを保存できませんでした。')
+      setSavingDose(false)
+      return
     }
+
+    setDoseLogs(current => [data, ...current].slice(0, 365))
+
+    if (selectedInventory && amount != null) {
+      const nextRemaining = Math.max(0, Number(selectedInventory.remaining_amount) - amount)
+      const { error: updateError } = await supabase
+        .from('additive_inventory')
+        .update({ remaining_amount: nextRemaining })
+        .eq('id', selectedInventory.id)
+
+      if (updateError) setError('添加ログは保存しましたが、残量の更新に失敗しました。')
+      else setInventory(current => current.map(item => item.id === selectedInventory.id ? { ...item, remaining_amount: nextRemaining } : item))
+    }
+
+    setDoseForm(current => ({
+      ...initialDoseForm,
+      dosed_at: current.dosed_at,
+      additive_inventory_id: current.additive_inventory_id,
+      additive_product_id: current.additive_product_id,
+      unit,
+    }))
     setSavingDose(false)
+  }
+
+  async function saveWaterChange(event) {
+    event.preventDefault()
+    setSavingWaterChange(true)
+    setError(null)
+    const payload = {
+      aquarium_id: selectedAquariumId,
+      user_id: session.user.id,
+      changed_at: waterChangeForm.changed_at,
+      amount_liters: parseNumber(waterChangeForm.amount_liters),
+      notes: waterChangeForm.notes.trim() || null,
+    }
+    const { data, error } = await supabase.from('water_change_logs').insert(payload).select('*').single()
+
+    if (error) setError('水換え履歴を保存できませんでした。')
+    else {
+      setWaterChanges(current => [data, ...current].slice(0, 100))
+      setWaterChangeForm(current => ({ ...initialWaterChangeForm, changed_at: current.changed_at }))
+    }
+    setSavingWaterChange(false)
   }
 
   if (!session) return <LoginPanel email={email} authMessage={authMessage} setEmail={setEmail} sendMagicLink={sendMagicLink} />
 
   const selectedAquarium = aquariums.find(item => item.id === selectedAquariumId)
+  const lowStockItems = inventory.filter(item => Number(item.remaining_amount) <= Number(item.low_stock_threshold))
+  const lastWaterChange = waterChanges[0]
 
   return (
     <section className="space-y-5 pb-10">
       {error && <div className="border border-rose-800 bg-rose-950/50 rounded-lg p-4 text-rose-100 text-sm">{error}</div>}
+      {lowStockItems.length > 0 && <LowStockAlert items={lowStockItems} />}
 
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs text-cyan-300 font-semibold">PRIVATE WATER LOG</p>
+          <p className="text-xs text-cyan-300 font-semibold">PRIVATE REEF LOG</p>
           <h2 className="text-2xl font-bold text-white">{selectedAquarium?.name || '水質管理'}</h2>
         </div>
         <div className="flex items-center gap-2">
@@ -225,7 +390,15 @@ export default function WaterQualityDashboard() {
         </div>
       </div>
 
+      <TankDataPanel aquarium={selectedAquarium} lastWaterChange={lastWaterChange} saving={savingTank} onSaveVolume={saveTankVolume} />
       <WaterLogForm form={waterForm} setForm={setWaterForm} saving={savingWater} onSubmit={saveWaterLog} />
+
+      <div className="grid xl:grid-cols-2 gap-4">
+        <InventoryPanel additives={additives} inventory={inventory} form={inventoryForm} setForm={setInventoryForm} saving={savingInventory} onSubmit={saveInventory} onArchive={archiveInventory} />
+        <WaterChangePanel form={waterChangeForm} setForm={setWaterChangeForm} saving={savingWaterChange} waterChanges={waterChanges} onSubmit={saveWaterChange} />
+      </div>
+
+      <AdditiveDoseForm additives={additives} inventory={inventory} form={doseForm} setForm={setDoseForm} saving={savingDose} onSubmit={saveDoseLog} />
 
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-lg font-bold text-white">水質グラフ</h3>
@@ -234,8 +407,6 @@ export default function WaterQualityDashboard() {
       <div className="grid lg:grid-cols-2 gap-4">
         {PARAMETERS.map(parameter => <TrendCard key={parameter.key} records={records} parameter={parameter} periodDays={periodDays} />)}
       </div>
-
-      <AdditiveDoseForm additives={additives} form={doseForm} setForm={setDoseForm} saving={savingDose} onSubmit={saveDoseLog} />
 
       <div className="grid lg:grid-cols-2 gap-4">
         {additives.filter(product => doseLogs.some(log => log.additive_product_id === product.id)).map(product => (
@@ -252,9 +423,9 @@ function LoginPanel({ email, authMessage, setEmail, sendMagicLink }) {
   return (
     <section className="max-w-md mx-auto py-12">
       <div className="bg-slate-900 border border-slate-800 rounded-lg p-6">
-        <p className="text-cyan-300 text-sm font-semibold">PRIVATE WATER LOG</p>
+        <p className="text-cyan-300 text-sm font-semibold">PRIVATE REEF LOG</p>
         <h2 className="text-2xl font-bold text-white mt-1">水質記録へログイン</h2>
-        <p className="text-sm text-slate-400 mt-2">記録とグラフはアカウントごとに保存されます。</p>
+        <p className="text-sm text-slate-400 mt-2">水質、添加剤、水換え履歴をアカウントごとに保存します。</p>
         <form onSubmit={sendMagicLink} className="mt-5">
           <input type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="メールアドレス" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
           <button type="submit" className="w-full bg-cyan-400 text-slate-950 font-bold rounded-md py-3 mt-3">ログインリンクを送る</button>
@@ -262,6 +433,50 @@ function LoginPanel({ email, authMessage, setEmail, sendMagicLink }) {
         </form>
       </div>
     </section>
+  )
+}
+
+function LowStockAlert({ items }) {
+  return (
+    <div className="border border-amber-700 bg-amber-950/50 rounded-lg p-4">
+      <p className="font-bold text-amber-100">添加剤の残量が少なくなっています</p>
+      <p className="text-sm text-amber-200 mt-1">
+        {items.slice(0, 3).map(item => `${productLabel(item.additive_products)} ${formatValue(item.remaining_amount, item.unit)}`).join(' / ')}
+        {items.length > 3 ? ` ほか${items.length - 3}件` : ''}
+      </p>
+    </div>
+  )
+}
+
+function TankDataPanel({ aquarium, lastWaterChange, saving, onSaveVolume }) {
+  const [volume, setVolume] = useState('')
+
+  useEffect(() => {
+    setVolume(aquarium?.volume_liters ?? '')
+  }, [aquarium?.id, aquarium?.volume_liters])
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h3 className="text-lg font-bold text-white">Tankデータ</h3>
+        <p className="text-xs text-slate-500">水量と直近の水換え</p>
+      </div>
+      <div className="grid md:grid-cols-[1fr_1fr] gap-3">
+        <form onSubmit={event => { event.preventDefault(); onSaveVolume(volume) }} className="bg-slate-950 border border-slate-800 rounded-md p-3">
+          <label>
+            <span className="text-xs text-slate-400">水量</span>
+            <div className="flex gap-2 mt-1">
+              <input type="number" inputMode="decimal" step="0.1" value={volume} onChange={event => setVolume(event.target.value)} placeholder="例: 120" className="min-w-0 flex-1 bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-white" />
+              <button type="submit" disabled={saving} className="bg-cyan-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md px-4 py-2 text-sm">保存</button>
+            </div>
+          </label>
+        </form>
+        <div className="bg-slate-950 border border-slate-800 rounded-md p-3">
+          <p className="text-xs text-slate-400">直近の水換え</p>
+          <p className="text-lg font-bold text-white mt-1">{lastWaterChange ? `${lastWaterChange.changed_at} / ${formatValue(lastWaterChange.amount_liters, 'L')}` : '未登録'}</p>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -286,12 +501,87 @@ function WaterLogForm({ form, setForm, saving, onSubmit }) {
   )
 }
 
-function AdditiveDoseForm({ additives, form, setForm, saving, onSubmit }) {
-  const groupedAdditives = additives.reduce((groups, product) => {
-    if (!groups[product.brand]) groups[product.brand] = []
-    groups[product.brand].push(product)
-    return groups
-  }, {})
+function InventoryPanel({ additives, inventory, form, setForm, saving, onSubmit, onArchive }) {
+  const groupedAdditives = groupByBrand(additives)
+  const lowItems = inventory.filter(item => Number(item.remaining_amount) <= Number(item.low_stock_threshold))
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+      <h3 className="text-lg font-bold text-white">持っている添加剤</h3>
+      <form onSubmit={onSubmit} className="mt-3 space-y-3">
+        <label>
+          <span className="text-xs text-slate-400">添加剤</span>
+          <select value={form.additive_product_id} onChange={event => {
+            const product = additives.find(item => item.id === event.target.value)
+            setForm(current => ({ ...current, additive_product_id: event.target.value, unit: product?.default_unit || 'ml' }))
+          }} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white">
+            {Object.entries(groupedAdditives).map(([brand, products]) => (
+              <optgroup key={brand} label={brand}>{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</optgroup>
+            ))}
+          </select>
+        </label>
+        <div className="grid grid-cols-3 gap-3">
+          <label><span className="text-xs text-slate-400">容量</span><input required type="number" inputMode="decimal" step="0.001" value={form.initial_amount} onChange={event => setForm(current => ({ ...current, initial_amount: event.target.value, remaining_amount: current.remaining_amount || event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>
+          <label><span className="text-xs text-slate-400">残量</span><input type="number" inputMode="decimal" step="0.001" value={form.remaining_amount} onChange={event => setForm(current => ({ ...current, remaining_amount: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>
+          <label><span className="text-xs text-slate-400">単位</span><input value={form.unit} onChange={event => setForm(current => ({ ...current, unit: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>
+        </div>
+        <label><span className="text-xs text-slate-400">アラート残量</span><input type="number" inputMode="decimal" step="0.001" value={form.low_stock_threshold} onChange={event => setForm(current => ({ ...current, low_stock_threshold: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>
+        <input value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} placeholder="メモ" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+        <button type="submit" disabled={saving || !form.additive_product_id} className="w-full bg-emerald-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-3">{saving ? '登録中...' : '添加剤を登録'}</button>
+      </form>
+      <div className="mt-4 divide-y divide-slate-800">
+        {inventory.slice(0, 8).map(item => <InventoryRow key={item.id} item={item} low={lowItems.some(low => low.id === item.id)} onArchive={onArchive} />)}
+        {inventory.length === 0 && <p className="py-6 text-center text-sm text-slate-500">手持ちの添加剤を登録してください。</p>}
+      </div>
+    </div>
+  )
+}
+
+function InventoryRow({ item, low, onArchive }) {
+  const percent = Number(item.initial_amount) > 0 ? Math.max(0, Math.min(100, Number(item.remaining_amount) / Number(item.initial_amount) * 100)) : 0
+  return (
+    <div className="py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-white">{productLabel(item.additive_products)}</p>
+          <p className={`text-xs mt-1 ${low ? 'text-amber-300' : 'text-slate-400'}`}>残量 {formatValue(item.remaining_amount, item.unit)} / {formatValue(item.initial_amount, item.unit)}</p>
+        </div>
+        <button type="button" onClick={() => onArchive(item.id)} className="text-xs text-slate-500 hover:text-white">非表示</button>
+      </div>
+      <div className="h-2 bg-slate-950 rounded-full overflow-hidden mt-2">
+        <div className={low ? 'h-full bg-amber-400' : 'h-full bg-emerald-400'} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function WaterChangePanel({ form, setForm, saving, waterChanges, onSubmit }) {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+      <h3 className="text-lg font-bold text-white">水換え履歴</h3>
+      <form onSubmit={onSubmit} className="mt-3 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <label><span className="text-xs text-slate-400">日付</span><input type="date" value={form.changed_at} onChange={event => setForm(current => ({ ...current, changed_at: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>
+          <label><span className="text-xs text-slate-400">水換え量 L</span><input required type="number" inputMode="decimal" step="0.1" value={form.amount_liters} onChange={event => setForm(current => ({ ...current, amount_liters: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>
+        </div>
+        <input value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} placeholder="メモ" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+        <button type="submit" disabled={saving} className="w-full bg-sky-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-3">{saving ? '保存中...' : '水換えを記録'}</button>
+      </form>
+      <div className="mt-4 divide-y divide-slate-800">
+        {waterChanges.slice(0, 8).map(change => (
+          <div key={change.id} className="py-3">
+            <p className="text-sm font-semibold text-white">{change.changed_at} / {formatValue(change.amount_liters, 'L')}</p>
+            {change.notes && <p className="text-xs text-slate-500 mt-1">{change.notes}</p>}
+          </div>
+        ))}
+        {waterChanges.length === 0 && <p className="py-6 text-center text-sm text-slate-500">水換え履歴はまだありません。</p>}
+      </div>
+    </div>
+  )
+}
+
+function AdditiveDoseForm({ additives, inventory, form, setForm, saving, onSubmit }) {
+  const groupedAdditives = groupByBrand(additives)
 
   return (
     <form onSubmit={onSubmit} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
@@ -299,37 +589,48 @@ function AdditiveDoseForm({ additives, form, setForm, saving, onSubmit }) {
         <h3 className="text-lg font-bold text-white">添加剤の記録</h3>
         <input type="date" value={form.dosed_at} onChange={event => setForm(current => ({ ...current, dosed_at: event.target.value }))} className="bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-white text-sm" />
       </div>
-      <div className="grid md:grid-cols-[1fr_120px_90px] gap-3">
+      <div className="grid md:grid-cols-[1fr_1fr_120px_90px] gap-3">
         <label>
-          <span className="text-xs text-slate-400">添加剤</span>
-          <select
-            value={form.additive_product_id}
-            onChange={event => {
-              const product = additives.find(item => item.id === event.target.value)
-              setForm(current => ({ ...current, additive_product_id: event.target.value, unit: product?.default_unit || 'ml' }))
-            }}
-            className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white"
-          >
-            {Object.entries(groupedAdditives).map(([brand, products]) => (
-              <optgroup key={brand} label={brand}>
-                {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
-              </optgroup>
-            ))}
+          <span className="text-xs text-slate-400">手持ちから選択</span>
+          <select value={form.additive_inventory_id} onChange={event => {
+            const item = inventory.find(row => row.id === event.target.value)
+            setForm(current => ({
+              ...current,
+              additive_inventory_id: event.target.value,
+              additive_product_id: item?.additive_product_id || current.additive_product_id,
+              unit: item?.unit || current.unit,
+            }))
+          }} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white">
+            <option value="">在庫を使わない</option>
+            {inventory.map(item => <option key={item.id} value={item.id}>{productLabel(item.additive_products)} / 残 {formatValue(item.remaining_amount, item.unit)}</option>)}
           </select>
         </label>
         <label>
-          <span className="text-xs text-slate-400">添加量</span>
-          <input required type="number" inputMode="decimal" step="0.001" value={form.amount} onChange={event => setForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+          <span className="text-xs text-slate-400">添加剤マスタ</span>
+          <select value={form.additive_product_id} onChange={event => {
+            const product = additives.find(item => item.id === event.target.value)
+            setForm(current => ({ ...current, additive_inventory_id: '', additive_product_id: event.target.value, unit: product?.default_unit || 'ml' }))
+          }} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white">
+            {Object.entries(groupedAdditives).map(([brand, products]) => (
+              <optgroup key={brand} label={brand}>{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</optgroup>
+            ))}
+          </select>
         </label>
-        <label>
-          <span className="text-xs text-slate-400">単位</span>
-          <input value={form.unit} onChange={event => setForm(current => ({ ...current, unit: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
-        </label>
+        <label><span className="text-xs text-slate-400">添加量</span><input required type="number" inputMode="decimal" step="0.001" value={form.amount} onChange={event => setForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>
+        <label><span className="text-xs text-slate-400">単位</span><input value={form.unit} onChange={event => setForm(current => ({ ...current, unit: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" /></label>
       </div>
       <input value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} placeholder="メモ" className="mt-3 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
       <button type="submit" disabled={saving || !form.additive_product_id} className="w-full bg-emerald-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-3 mt-3">{saving ? '保存中...' : '添加量を記録'}</button>
     </form>
   )
+}
+
+function groupByBrand(additives) {
+  return additives.reduce((groups, product) => {
+    if (!groups[product.brand]) groups[product.brand] = []
+    groups[product.brand].push(product)
+    return groups
+  }, {})
 }
 
 function PeriodSwitch({ value, onChange }) {
@@ -458,7 +759,7 @@ function RecentLists({ records, doseLogs, loading }) {
         renderItem={log => (
           <>
             <p className="text-sm font-semibold text-white">{log.dosed_at}</p>
-            <p className="text-xs text-slate-400 mt-1">{log.additive_products?.brand} {log.additive_products?.name} / {formatValue(log.amount, log.unit)}</p>
+            <p className="text-xs text-slate-400 mt-1">{productLabel(log.additive_products)} / {formatValue(log.amount, log.unit)}</p>
           </>
         )}
       />
