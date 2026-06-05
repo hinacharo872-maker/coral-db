@@ -443,6 +443,8 @@ const DEMO_WATER_LOGS_BACKUP_KEY = 'demo_water_logs_backup'
 const DEMO_CUSTOM_PARAMETERS_KEY = 'demo_custom_parameters'
 const DEMO_EVENT_LOGS_KEY = 'demo_aquarium_event_logs'
 const DEMO_TARGET_SETTINGS_KEY = 'demo_target_settings'
+const DEMO_SAMPLE_SEEDED_KEY = 'demo_sample_seeded'
+const DEMO_SAMPLE_DISABLED_KEY = 'demo_sample_disabled'
 const BUILTIN_PARAMETER_KEYS = new Set(PARAMETERS.map(parameter => parameter.key))
 
 function todayIso() {
@@ -588,6 +590,81 @@ function writeStorageArray(key, value) {
   window.localStorage.setItem(key, JSON.stringify(value))
 }
 
+function dateDaysAgo(daysAgo) {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  date.setDate(date.getDate() - daysAgo)
+  const offset = date.getTimezoneOffset() * 60000
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10)
+}
+
+function createDemoWaterSamples() {
+  const rows = [
+    { daysAgo: 11, temperature: 25.1, salinity: 1.025, ph: 8.18, kh: 8.2, calcium: 430, magnesium: 1320, nitrate: 4.0, phosphate: 0.04, notes: 'デモ: 通常測定' },
+    { daysAgo: 10, temperature: 25.0, salinity: 1.025, ph: 8.15, kh: 8.1, calcium: 428, magnesium: 1320, nitrate: 4.5, phosphate: 0.04, notes: 'デモ: 通常測定' },
+    { daysAgo: 9, temperature: 25.2, salinity: 1.025, ph: 8.12, kh: 8.0, calcium: 426, magnesium: 1310, nitrate: 5.2, phosphate: 0.05, notes: 'デモ: 給餌量を少し増やした想定' },
+    { daysAgo: 8, temperature: 25.3, salinity: 1.026, ph: 8.08, kh: 7.9, calcium: 425, magnesium: 1310, nitrate: 6.8, phosphate: 0.07, notes: 'デモ: NO3がゆっくり上昇' },
+    { daysAgo: 7, temperature: 25.2, salinity: 1.025, ph: 8.10, kh: 8.0, calcium: 430, magnesium: 1320, nitrate: 7.5, phosphate: 0.09, notes: 'デモ: PO4がやや高め' },
+    { daysAgo: 6, temperature: 25.1, salinity: 1.025, ph: 8.14, kh: 8.2, calcium: 435, magnesium: 1325, nitrate: 8.0, phosphate: 0.06, notes: 'デモ: 水換え後にPO4が低下' },
+    { daysAgo: 5, temperature: 25.0, salinity: 1.025, ph: 8.16, kh: 8.1, calcium: 432, magnesium: 1320, nitrate: 9.4, phosphate: 0.07, notes: 'デモ: 通常測定' },
+    { daysAgo: 4, temperature: 25.2, salinity: 1.025, ph: 8.05, kh: 7.8, calcium: 426, magnesium: 1315, nitrate: 12.2, phosphate: 0.08, notes: 'デモ: NO3上昇傾向' },
+    { daysAgo: 3, temperature: 25.4, salinity: 1.025, ph: 8.00, kh: 7.7, calcium: 420, magnesium: 1310, nitrate: 16.0, phosphate: 0.09, notes: 'デモ: 給餌変更の影響を観察' },
+    { daysAgo: 2, temperature: 25.2, salinity: 1.025, ph: 7.95, kh: 8.1, calcium: 425, magnesium: 1320, nitrate: 21.5, phosphate: 0.08, notes: 'デモ: KH添加後に回復' },
+    { daysAgo: 1, temperature: 25.2, salinity: 1.025, ph: 7.90, kh: 8.2, calcium: 430, magnesium: 1320, nitrate: 24.0, phosphate: 0.09, notes: 'デモ: NO3が高め' },
+    { daysAgo: 0, temperature: 25.3, salinity: 1.025, ph: 7.78, kh: 6.9, calcium: 418, magnesium: 1310, nitrate: 26.5, phosphate: 0.12, notes: 'デモ: KH急低下、PO4/NO3高めの例' },
+  ]
+
+  return rows
+    .map(row => ({
+      ...row,
+      id: `demo-sample-water-${row.daysAgo}`,
+      aquarium_id: 'demo-aquarium',
+      user_id: null,
+      measured_at: dateDaysAgo(row.daysAgo),
+      custom_values: {},
+      created_at: new Date(`${dateDaysAgo(row.daysAgo)}T12:00:00`).toISOString(),
+    }))
+    .sort((a, b) => b.measured_at.localeCompare(a.measured_at))
+}
+
+function createDemoEventSamples() {
+  return [
+    { daysAgo: 10, event_type: 'lighting_change', title: '照明ピークを30分延長', notes: 'デモ: 色揚がり観察のため少し変更' },
+    { daysAgo: 8, event_type: 'feeding_change', title: '冷凍餌を少し増量', notes: 'デモ: NO3/PO4上昇との関係を見る例' },
+    { daysAgo: 6, event_type: 'water_change', title: '水換え 20L', notes: 'デモ: PO4が一度下がるイベント' },
+    { daysAgo: 2, event_type: 'dosing', title: 'KH添加量を調整', notes: 'デモ: KH変動を確認するイベント' },
+  ].map(event => ({
+    ...event,
+    id: `demo-sample-event-${event.daysAgo}`,
+    aquarium_id: 'demo-aquarium',
+    user_id: null,
+    event_at: dateDaysAgo(event.daysAgo),
+    metadata: { demo: true },
+    created_at: new Date(`${dateDaysAgo(event.daysAgo)}T13:00:00`).toISOString(),
+  }))
+}
+
+function ensureDemoSamples() {
+  if (typeof window === 'undefined') return { records: [], events: [], seeded: false }
+  const disabled = window.localStorage.getItem(DEMO_SAMPLE_DISABLED_KEY) === 'true'
+  const currentLogs = readStorageArray(DEMO_WATER_LOGS_KEY)
+  const currentEvents = readStorageArray(DEMO_EVENT_LOGS_KEY)
+  if (currentLogs.length || disabled) {
+    return {
+      records: currentLogs,
+      events: currentEvents,
+      seeded: window.localStorage.getItem(DEMO_SAMPLE_SEEDED_KEY) === 'true' && currentLogs.some(record => String(record.id).startsWith('demo-sample-water-')),
+    }
+  }
+
+  const records = createDemoWaterSamples()
+  const events = currentEvents.length ? currentEvents : createDemoEventSamples()
+  writeStorageArray(DEMO_WATER_LOGS_KEY, records)
+  writeStorageArray(DEMO_EVENT_LOGS_KEY, events)
+  window.localStorage.setItem(DEMO_SAMPLE_SEEDED_KEY, 'true')
+  return { records, events, seeded: true }
+}
+
 function demoAquarium() {
   let settings = null
   try {
@@ -609,6 +686,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   const [email, setEmail] = useState('')
   const [authMessage, setAuthMessage] = useState('')
   const [demoMessage, setDemoMessage] = useState('')
+  const [demoSampleActive, setDemoSampleActive] = useState(false)
   const [aquariums, setAquariums] = useState([])
   const [selectedAquariumId, setSelectedAquariumId] = useState('')
   const [records, setRecords] = useState([])
@@ -651,7 +729,6 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       setInventory([])
       setDoseLogs([])
       setWaterChanges([])
-      setEventLogs(readStorageArray(DEMO_EVENT_LOGS_KEY))
     }
   }, [session])
 
@@ -678,13 +755,32 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
 
   function bootstrapDemo() {
     setLoading(true)
+    setError(null)
     const demoParameters = readStorageArray(DEMO_CUSTOM_PARAMETERS_KEY).map(parameter => normalizeParameter(parameter, text))
     const activeParameters = [...PARAMETERS.map(parameter => normalizeParameter(parameter, text)), ...demoParameters]
+    const demoSamples = ensureDemoSamples()
     setWaterParameters(activeParameters)
     setAquariums([demoAquarium()])
     setSelectedAquariumId('demo-aquarium')
-    setRecords(readStorageArray(DEMO_WATER_LOGS_KEY))
+    setRecords(demoSamples.records)
+    setEventLogs(demoSamples.events)
+    setDemoSampleActive(demoSamples.seeded)
     setLoading(false)
+  }
+
+  function deleteDemoSamples() {
+    const nextRecords = records.filter(record => !String(record.id).startsWith('demo-sample-water-'))
+    const nextEvents = eventLogs.filter(event => !String(event.id).startsWith('demo-sample-event-'))
+    writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)
+    writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(DEMO_SAMPLE_DISABLED_KEY, 'true')
+      window.localStorage.removeItem(DEMO_SAMPLE_SEEDED_KEY)
+    }
+    setRecords(nextRecords)
+    setEventLogs(nextEvents)
+    setDemoSampleActive(false)
+    setDemoMessage('デモデータを削除しました。まずはKHだけでも記録してみましょう。')
   }
 
   async function fetchAdditives() {
@@ -888,9 +984,20 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     })
     if (isDemoMode) {
       const data = { ...payload, id: createLocalId(), created_at: new Date().toISOString(), aquarium_id: 'demo-aquarium', user_id: null }
-      const nextRecords = [data, ...records].slice(0, 365)
+      const baseRecords = demoSampleActive ? [] : records
+      const nextRecords = [data, ...baseRecords].slice(0, 365)
       setRecords(nextRecords)
       writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)
+      if (demoSampleActive) {
+        writeStorageArray(DEMO_EVENT_LOGS_KEY, [])
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(DEMO_SAMPLE_DISABLED_KEY, 'true')
+          window.localStorage.removeItem(DEMO_SAMPLE_SEEDED_KEY)
+        }
+        setEventLogs([])
+        setDemoSampleActive(false)
+        setDemoMessage('記録を開始したため、サンプルデータを自分のデータに置き換えました。')
+      }
       setWaterForm(current => buildInitialWaterForm(waterParameters, current.measured_at))
       setSavingWater(false)
       return
@@ -1076,7 +1183,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
 
   return (
     <section className="space-y-5 pb-10">
-      {isDemoMode && <DemoModePanel text={text} email={email} authMessage={authMessage} setEmail={setEmail} sendMagicLink={sendMagicLink} />}
+      {isDemoMode && <DemoModePanel text={text} email={email} authMessage={authMessage} demoSampleActive={demoSampleActive} setEmail={setEmail} sendMagicLink={sendMagicLink} onDeleteDemoSamples={deleteDemoSamples} />}
       {error && <div className="border border-rose-800 bg-rose-950/50 rounded-lg p-4 text-rose-100 text-sm">{error}</div>}
       {demoMessage && <div className="border border-emerald-800 bg-emerald-950/50 rounded-lg p-4 text-emerald-100 text-sm">{demoMessage}</div>}
       {lowStockItems.length > 0 && <LowStockAlert text={text} locale={locale} items={lowStockItems} />}
@@ -1125,7 +1232,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         ))}
       </div>}
 
-      <RecentLists text={text} locale={locale} records={records} doseLogs={doseLogs} loading={loading} />
+      <RecentLists text={text} locale={locale} records={records} doseLogs={doseLogs} loading={loading} error={error} />
     </section>
   )
 }
@@ -1147,13 +1254,22 @@ function LoginPanel({ text, email, authMessage, setEmail, sendMagicLink }) {
   )
 }
 
-function DemoModePanel({ text, email, authMessage, setEmail, sendMagicLink }) {
+function DemoModePanel({ text, email, authMessage, demoSampleActive, setEmail, sendMagicLink, onDeleteDemoSamples }) {
   return (
     <div className="border border-cyan-800 bg-cyan-950/40 rounded-lg p-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-cyan-200 font-bold">デモモード</p>
           <p className="text-sm text-cyan-100/90 mt-1">※現在デモモードです。データはブラウザに一時保存されます。</p>
+          {demoSampleActive && (
+            <div className="mt-3 rounded-md border border-cyan-700 bg-slate-950/50 p-3">
+              <p className="text-sm font-semibold text-cyan-100">これはデモデータです。</p>
+              <p className="text-xs text-cyan-100/80 mt-1">ログイン、または水質記録を開始すると自分のデータに置き換わります。KH急低下、PO4高め、NO3上昇傾向のサンプルを入れています。</p>
+              <button type="button" onClick={onDeleteDemoSamples} className="mt-2 rounded-md border border-cyan-700 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-900">
+                デモデータを削除
+              </button>
+            </div>
+          )}
         </div>
         <form onSubmit={sendMagicLink} className="flex flex-col sm:flex-row gap-2 min-w-full sm:min-w-[420px]">
           <input type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder={text.email} className="min-w-0 flex-1 bg-slate-950 border border-cyan-800 rounded-md px-3 py-3 text-white" />
@@ -1192,7 +1308,7 @@ function WaterInsightPanel({ text, locale, analysis }) {
     return (
       <div className="border border-slate-800 bg-slate-900 rounded-lg p-4">
         <h3 className="text-lg font-bold text-white">今日の判断</h3>
-        <p className="text-sm text-slate-400 mt-2">水質を1件保存すると、前回差分・異常検知・確認すべきことをここに表示します。</p>
+        <p className="text-sm text-slate-400 mt-2">まずはKHだけでも記録してみましょう。次回からは前回値コピーで入力が楽になり、差分・警告・確認すべきことがここに表示されます。</p>
       </div>
     )
   }
@@ -1641,7 +1757,7 @@ function ChartCard({ title, subtitle, color, points, unit, minGuide, maxGuide, c
             <path d={path} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             {points.map((point, index) => <circle key={`${point.date}-${index}`} cx={x(index)} cy={y(point.value)} r="1.8" fill={color} />)}
           </svg>
-        ) : <div className="h-full flex items-center justify-center text-sm text-slate-500">{text.noRecords}</div>}
+        ) : <div className="h-full flex flex-col items-center justify-center px-4 text-center text-sm text-slate-500"><p>{text.noRecords}</p><p className="mt-1 text-xs">まずはKHだけでも記録すると、推移と目標レンジが見えるようになります。</p></div>}
       </div>
       {children}
       {points.length > 0 && <p className="text-xs text-slate-500 mt-3">{text.latest}: {points[points.length - 1].date} / {formatValue(points[points.length - 1].value, unit, locale)}</p>}
@@ -1657,13 +1773,19 @@ function Stat({ label, value, unit, locale }) {
   return <div className="bg-slate-950 border border-slate-800 rounded-md p-3"><p className="text-[11px] text-slate-500">{label}</p><p className="text-sm font-bold text-white mt-1">{value == null ? '-' : formatValue(Number(value.toFixed(3)), unit, locale)}</p></div>
 }
 
-function RecentLists({ text, locale, records, doseLogs, loading }) {
+function RecentLists({ text, locale, records, doseLogs, loading, error }) {
+  const emptyWater = error ? (
+    <span className="text-rose-300">水質記録の読み込みでエラーが発生しました。</span>
+  ) : (
+    <span>まだ記録がありません。まずはKHだけでも記録してみましょう。前回値コピーで次回入力が楽になります。</span>
+  )
+
   return (
     <div className="grid lg:grid-cols-2 gap-4">
-      <RecentPanel title={text.recentWaterRecords} emptyText={loading ? text.loading : text.noWaterRecords} items={records.slice(0, 8)} renderItem={record => (
+      <RecentPanel title={text.recentWaterRecords} emptyText={loading ? text.loading : emptyWater} items={records.slice(0, 8)} renderItem={record => (
         <>
           <p className="text-sm font-semibold text-white">{record.measured_at}</p>
-          <p className="text-xs text-slate-400 mt-1">{text.parameters.temperature} {formatValue(record.temperature, '°C', locale)} / KH {formatValue(record.kh, 'dKH', locale)} / NO3 {formatValue(record.nitrate, 'ppm', locale)}</p>
+          <p className="text-xs text-slate-400 mt-1">{text.parameters.temperature} {formatValue(getRecordValue(record, 'temperature'), '°C', locale)} / KH {formatValue(getRecordValue(record, 'kh'), 'dKH', locale)} / NO3 {formatValue(getRecordValue(record, 'nitrate'), 'ppm', locale)}</p>
         </>
       )} />
       <RecentPanel title={text.recentDoseRecords} emptyText={text.noDoseRecords} items={doseLogs.slice(0, 8)} renderItem={log => (
