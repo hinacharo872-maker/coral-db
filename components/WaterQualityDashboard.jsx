@@ -577,17 +577,22 @@ function escapeCsv(value) {
 }
 
 function downloadCsv(filename, rows) {
-  if (typeof window === 'undefined') return
-  const csv = rows.map(row => row.map(escapeCsv).join(',')).join('\r\n')
-  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const url = window.URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  window.URL.revokeObjectURL(url)
+  if (typeof window === 'undefined') return false
+  try {
+    const csv = rows.map(row => row.map(escapeCsv).join(',')).join('\r\n')
+    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(url)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function exportWaterLogs(records, parameters, text) {
@@ -599,7 +604,7 @@ function exportWaterLogs(records, parameters, text) {
       rows.push([record.measured_at, labelFor(parameter, text), value, parameter.unit || '', record.notes || ''])
     })
   })
-  downloadCsv(`water-quality-logs-${todayIso()}.csv`, rows)
+  return downloadCsv(`water-quality-logs-${todayIso()}.csv`, rows)
 }
 
 function exportEventLogs(events) {
@@ -607,7 +612,7 @@ function exportEventLogs(events) {
   sortEventLogs(events).reverse().forEach(event => {
     rows.push([event.event_at, eventLabel(event.event_type), event.title || '', event.notes || ''])
   })
-  downloadCsv(`aquarium-events-${todayIso()}.csv`, rows)
+  return downloadCsv(`aquarium-events-${todayIso()}.csv`, rows)
 }
 
 function targetRangeFor(parameter, targets) {
@@ -754,8 +759,25 @@ function readStorageArray(key) {
 }
 
 function writeStorageArray(key, value) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(key, JSON.stringify(value))
+  if (typeof window === 'undefined') return false
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value))
+    return true
+  } catch {
+    return false
+  }
+}
+
+function canUseLocalStorage() {
+  if (typeof window === 'undefined') return false
+  try {
+    const key = '__aqua_reef_log_storage_test__'
+    window.localStorage.setItem(key, '1')
+    window.localStorage.removeItem(key)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function dateDaysAgo(daysAgo) {
@@ -813,7 +835,7 @@ function createDemoEventSamples() {
 }
 
 function ensureDemoSamples() {
-  if (typeof window === 'undefined') return { records: [], events: [], seeded: false }
+  if (typeof window === 'undefined') return { records: [], events: [], seeded: false, storageError: false }
   const disabled = window.localStorage.getItem(DEMO_SAMPLE_DISABLED_KEY) === 'true'
   const currentLogs = readStorageArray(DEMO_WATER_LOGS_KEY)
   const currentEvents = readStorageArray(DEMO_EVENT_LOGS_KEY)
@@ -822,15 +844,21 @@ function ensureDemoSamples() {
       records: currentLogs,
       events: currentEvents,
       seeded: window.localStorage.getItem(DEMO_SAMPLE_SEEDED_KEY) === 'true' && currentLogs.some(record => String(record.id).startsWith('demo-sample-water-')),
+      storageError: false,
     }
   }
 
   const records = createDemoWaterSamples()
   const events = currentEvents.length ? currentEvents : createDemoEventSamples()
-  writeStorageArray(DEMO_WATER_LOGS_KEY, records)
-  writeStorageArray(DEMO_EVENT_LOGS_KEY, events)
-  window.localStorage.setItem(DEMO_SAMPLE_SEEDED_KEY, 'true')
-  return { records, events, seeded: true }
+  const logsSaved = writeStorageArray(DEMO_WATER_LOGS_KEY, records)
+  const eventsSaved = writeStorageArray(DEMO_EVENT_LOGS_KEY, events)
+  let markerSaved = true
+  try {
+    window.localStorage.setItem(DEMO_SAMPLE_SEEDED_KEY, 'true')
+  } catch {
+    markerSaved = false
+  }
+  return { records, events, seeded: true, storageError: !logsSaved || !eventsSaved || !markerSaved }
 }
 
 function demoAquarium() {
@@ -928,6 +956,9 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   function bootstrapDemo() {
     setLoading(true)
     setError(null)
+    if (!canUseLocalStorage()) {
+      setError('ブラウザの一時保存が使えません。デモデータは表示できますが、記録の保存やCSVバックアップ前の保持ができない場合があります。')
+    }
     const demoParameters = readStorageArray(DEMO_CUSTOM_PARAMETERS_KEY).map(parameter => normalizeParameter(parameter, text))
     const activeParameters = [...PARAMETERS.map(parameter => normalizeParameter(parameter, text)), ...demoParameters]
     const demoSamples = ensureDemoSamples()
@@ -937,14 +968,18 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     setRecords(demoSamples.records)
     setEventLogs(demoSamples.events)
     setDemoSampleActive(demoSamples.seeded)
+    if (demoSamples.storageError) {
+      setError('デモデータをブラウザに一時保存できませんでした。表示はできますが、ページ更新後に消える可能性があります。')
+    }
     setLoading(false)
   }
 
   function deleteDemoSamples() {
     const nextRecords = records.filter(record => !String(record.id).startsWith('demo-sample-water-'))
     const nextEvents = eventLogs.filter(event => !String(event.id).startsWith('demo-sample-event-'))
-    writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)
-    writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)
+    if (!writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords) || !writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)) {
+      setError('デモデータの削除状態をブラウザに保存できませんでした。ブラウザの容量やプライベートモード設定を確認してください。')
+    }
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(DEMO_SAMPLE_DISABLED_KEY, 'true')
       window.localStorage.removeItem(DEMO_SAMPLE_SEEDED_KEY)
@@ -1130,7 +1165,11 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   async function saveTargetSettings(preset, targets) {
     setSavingTargets(true)
     if (isDemoMode) {
-      if (typeof window !== 'undefined') window.localStorage.setItem(DEMO_TARGET_SETTINGS_KEY, JSON.stringify({ preset, targets }))
+      try {
+        if (typeof window !== 'undefined') window.localStorage.setItem(DEMO_TARGET_SETTINGS_KEY, JSON.stringify({ preset, targets }))
+      } catch {
+        setError('目標値の設定をブラウザに一時保存できませんでした。ブラウザの保存設定を確認してください。')
+      }
       const nextAquarium = { ...demoAquarium(), target_preset: preset, custom_targets: targets }
       setAquariums([nextAquarium])
       setSavingTargets(false)
@@ -1171,9 +1210,13 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       const nextRecords = sortWaterRecords([data, ...baseRecords]).slice(0, 365)
       setSaveFeedback(buildSaveFeedback(data, baseRecords[0], waterParameters, targetSettings.targets, text, locale))
       setRecords(nextRecords)
-      writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)
+      if (!writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)) {
+        setError('水質ログをブラウザに一時保存できませんでした。ブラウザの容量やプライベートモード設定を確認してください。')
+      }
       if (demoSampleActive && !editingWaterId) {
-        writeStorageArray(DEMO_EVENT_LOGS_KEY, [])
+        if (!writeStorageArray(DEMO_EVENT_LOGS_KEY, [])) {
+          setError('イベントログの一時保存を更新できませんでした。ブラウザの保存設定を確認してください。')
+        }
         if (typeof window !== 'undefined') {
           window.localStorage.setItem(DEMO_SAMPLE_DISABLED_KEY, 'true')
           window.localStorage.removeItem(DEMO_SAMPLE_SEEDED_KEY)
@@ -1221,7 +1264,9 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     if (isDemoMode) {
       const nextRecords = records.filter(item => item.id !== record.id)
       setRecords(nextRecords)
-      writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)
+      if (!writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)) {
+        setError('削除結果をブラウザに一時保存できませんでした。ページを更新すると元に戻る可能性があります。')
+      }
       if (editingWaterId === record.id) cancelWaterEdit()
       return
     }
@@ -1247,7 +1292,9 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     if (isDemoMode) {
       const current = readStorageArray(DEMO_CUSTOM_PARAMETERS_KEY)
       const next = [...current.filter(item => item.key !== key), nextParameter]
-      writeStorageArray(DEMO_CUSTOM_PARAMETERS_KEY, next)
+      if (!writeStorageArray(DEMO_CUSTOM_PARAMETERS_KEY, next)) {
+        setError('カスタム項目をブラウザに一時保存できませんでした。ブラウザの保存設定を確認してください。')
+      }
       setWaterParameters(currentParameters => [...currentParameters.filter(item => item.key !== key), nextParameter])
       return
     }
@@ -1276,7 +1323,9 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     if (!parameter || parameter.isBuiltin) return
     if (isDemoMode) {
       const next = readStorageArray(DEMO_CUSTOM_PARAMETERS_KEY).filter(item => item.key !== parameterKey)
-      writeStorageArray(DEMO_CUSTOM_PARAMETERS_KEY, next)
+      if (!writeStorageArray(DEMO_CUSTOM_PARAMETERS_KEY, next)) {
+        setError('カスタム項目の変更をブラウザに一時保存できませんでした。')
+      }
       setWaterParameters(current => current.filter(item => item.key !== parameterKey))
       return
     }
@@ -1384,7 +1433,9 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       const data = { ...payload, id: editingEventId || createLocalId(), aquarium_id: 'demo-aquarium', user_id: null, created_at: existingEvent?.created_at || new Date().toISOString() }
       const nextEvents = sortEventLogs([data, ...eventLogs.filter(item => item.id !== data.id)]).slice(0, 100)
       setEventLogs(nextEvents)
-      writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)
+      if (!writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)) {
+        setError('イベントログをブラウザに一時保存できませんでした。ブラウザの容量やプライベートモード設定を確認してください。')
+      }
       setEditingEventId(null)
       setEventForm(current => ({ ...initialEventForm, event_at: current.event_at, event_type: current.event_type }))
       setSavingEvent(false)
@@ -1423,7 +1474,9 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     if (isDemoMode) {
       const nextEvents = eventLogs.filter(item => item.id !== eventLog.id)
       setEventLogs(nextEvents)
-      writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)
+      if (!writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)) {
+        setError('削除結果をブラウザに一時保存できませんでした。ページを更新すると元に戻る可能性があります。')
+      }
       if (editingEventId === eventLog.id) cancelEventEdit()
       return
     }
@@ -1442,6 +1495,12 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   const waterAnalysis = buildWaterAnalysis(records, waterParameters, targetSettings.targets, text)
   const reminders = buildReminders(records)
   const todayTasks = buildTodayTasks(waterAnalysis, reminders, eventLogs)
+  const exportWaterCsv = () => {
+    if (!exportWaterLogs(records, waterParameters, text)) setError('水質ログのCSV出力に失敗しました。ブラウザのダウンロード許可設定を確認してください。')
+  }
+  const exportEventCsv = () => {
+    if (!exportEventLogs(eventLogs)) setError('イベントログのCSV出力に失敗しました。ブラウザのダウンロード許可設定を確認してください。')
+  }
 
   return (
     <section className="space-y-5 pb-10">
@@ -1486,7 +1545,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         <h3 className="text-lg font-bold text-white">{text.waterChart}</h3>
         <PeriodSwitch value={periodDays} onChange={setPeriodDays} />
       </div>
-      <ExportPanel isDemoMode={isDemoMode} records={records} eventLogs={eventLogs} onExportWater={() => exportWaterLogs(records, waterParameters, text)} onExportEvents={() => exportEventLogs(eventLogs)} />
+      <ExportPanel isDemoMode={isDemoMode} records={records} eventLogs={eventLogs} onExportWater={exportWaterCsv} onExportEvents={exportEventCsv} />
       <div className="grid lg:grid-cols-2 gap-4">
         {waterParameters.map(parameter => <TrendCard key={parameter.key} text={text} locale={locale} records={records} eventLogs={eventLogs} parameter={parameter} periodDays={periodDays} target={targetRangeFor(parameter, targetSettings.targets)} />)}
       </div>
