@@ -297,8 +297,8 @@ const TEXT = {
 const NUMBER_LOCALE = { ja: 'ja-JP', en: 'en-US', de: 'de-DE', zh: 'zh-CN' }
 
 const PARAMETERS = [
-  { key: 'temperature', unit: '°C', min: 24, max: 26.5, step: '0.1', defaultValue: 25.0, color: '#22d3ee' },
-  { key: 'salinity', unit: '', min: 1.024, max: 1.026, step: '0.001', defaultValue: 1.025, color: '#38bdf8' },
+  { key: 'temperature', unit: '℃', min: 24, max: 26.5, step: '0.1', defaultValue: 25.0, color: '#22d3ee' },
+  { key: 'salinity', unit: 'SG', min: 1.024, max: 1.026, step: '0.001', defaultValue: 1.025, color: '#38bdf8' },
   { key: 'ph', unit: '', min: 8.0, max: 8.4, step: '0.1', defaultValue: 8.2, color: '#a78bfa' },
   { key: 'kh', unit: 'dKH', min: 7.0, max: 9.0, step: '0.1', defaultValue: 8.0, color: '#f59e0b' },
   { key: 'calcium', unit: 'ppm', min: 400, max: 450, step: '5', defaultValue: 430, color: '#f472b6' },
@@ -371,6 +371,17 @@ const ANALYSIS_RULES = {
   magnesium: { cautionDelta: 50, dangerDelta: 100 },
   nitrate: { cautionHigh: 15, dangerHigh: 25 },
   phosphate: { cautionHigh: 0.08, dangerHigh: 0.1 },
+}
+
+const VALIDATION_LIMITS = {
+  temperature: { min: 10, max: 40, label: '水温', unit: '℃' },
+  salinity: { min: 0.99, max: 1.04, label: '比重', unit: 'SG' },
+  ph: { min: 6.5, max: 9.5, label: 'pH', unit: '' },
+  kh: { min: 0, max: 20, label: 'KH', unit: 'dKH' },
+  calcium: { min: 200, max: 600, label: 'Ca', unit: 'ppm' },
+  magnesium: { min: 800, max: 1800, label: 'Mg', unit: 'ppm' },
+  nitrate: { min: 0, max: 200, label: 'NO3', unit: 'ppm' },
+  phosphate: { min: 0, max: 5, label: 'PO4', unit: 'ppm' },
 }
 
 const ACTION_SUGGESTIONS = {
@@ -524,6 +535,79 @@ function getRecordValue(record, key) {
   if (!record) return null
   const value = record[key] ?? record.custom_values?.[key]
   return parseNumber(value)
+}
+
+function sortWaterRecords(records) {
+  return [...records].sort((a, b) => `${b.measured_at || ''}${b.created_at || ''}`.localeCompare(`${a.measured_at || ''}${a.created_at || ''}`))
+}
+
+function sortEventLogs(events) {
+  return [...events].sort((a, b) => `${b.event_at || ''}${b.created_at || ''}`.localeCompare(`${a.event_at || ''}${a.created_at || ''}`))
+}
+
+function recordToWaterForm(record, parameters) {
+  const next = buildInitialWaterForm(parameters, record.measured_at || todayIso())
+  parameters.forEach(parameter => {
+    const value = getRecordValue(record, parameter.key)
+    next[parameter.key] = value == null ? '' : String(value)
+  })
+  next.notes = record.notes || ''
+  return next
+}
+
+function validateWaterForm(form, parameters, text) {
+  return parameters.flatMap(parameter => {
+    const limits = VALIDATION_LIMITS[parameter.key]
+    if (!limits) return []
+    const value = parseNumber(form[parameter.key])
+    if (value == null) return []
+    const warnings = []
+    const label = labelFor(parameter, text)
+    const unit = parameter.unit || limits.unit || ''
+    if (limits.min != null && value < limits.min) warnings.push(`${label}: ${formatValue(value, unit)} は通常確認範囲 ${formatValue(limits.min, unit)} 未満です`)
+    if (limits.max != null && value > limits.max) warnings.push(`${label}: ${formatValue(value, unit)} は通常確認範囲 ${formatValue(limits.max, unit)} 超です`)
+    return warnings
+  })
+}
+
+function escapeCsv(value) {
+  if (value == null) return ''
+  const textValue = String(value)
+  return /[",\r\n]/.test(textValue) ? `"${textValue.replace(/"/g, '""')}"` : textValue
+}
+
+function downloadCsv(filename, rows) {
+  if (typeof window === 'undefined') return
+  const csv = rows.map(row => row.map(escapeCsv).join(',')).join('\r\n')
+  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = window.URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  window.URL.revokeObjectURL(url)
+}
+
+function exportWaterLogs(records, parameters, text) {
+  const rows = [['date', 'item', 'value', 'unit', 'notes']]
+  sortWaterRecords(records).reverse().forEach(record => {
+    parameters.forEach(parameter => {
+      const value = getRecordValue(record, parameter.key)
+      if (value == null) return
+      rows.push([record.measured_at, labelFor(parameter, text), value, parameter.unit || '', record.notes || ''])
+    })
+  })
+  downloadCsv(`water-quality-logs-${todayIso()}.csv`, rows)
+}
+
+function exportEventLogs(events) {
+  const rows = [['date', 'type', 'title', 'notes']]
+  sortEventLogs(events).reverse().forEach(event => {
+    rows.push([event.event_at, eventLabel(event.event_type), event.title || '', event.notes || ''])
+  })
+  downloadCsv(`aquarium-events-${todayIso()}.csv`, rows)
 }
 
 function targetRangeFor(parameter, targets) {
@@ -786,7 +870,10 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   const [inventoryForm, setInventoryForm] = useState(initialInventoryForm)
   const [waterChangeForm, setWaterChangeForm] = useState(initialWaterChangeForm)
   const [eventForm, setEventForm] = useState(initialEventForm)
-  const [periodDays, setPeriodDays] = useState(7)
+  const [periodDays, setPeriodDays] = useState(30)
+  const [editingWaterId, setEditingWaterId] = useState(null)
+  const [editingEventId, setEditingEventId] = useState(null)
+  const [validationWarnings, setValidationWarnings] = useState([])
   const [savingWater, setSavingWater] = useState(false)
   const [savingDose, setSavingDose] = useState(false)
   const [savingInventory, setSavingInventory] = useState(false)
@@ -1061,6 +1148,15 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     setSavingWater(true)
     setError(null)
     setSaveFeedback('')
+    const warnings = validateWaterForm(waterForm, waterParameters, text)
+    setValidationWarnings(warnings)
+    if (warnings.length && typeof window !== 'undefined') {
+      const confirmed = window.confirm(`測定値を確認してください。\n\n${warnings.join('\n')}\n\nこのまま保存しますか？`)
+      if (!confirmed) {
+        setSavingWater(false)
+        return
+      }
+    }
     const customValues = {}
     const payload = { aquarium_id: selectedAquariumId, user_id: session?.user?.id, measured_at: waterForm.measured_at, notes: waterForm.notes.trim() || null, custom_values: customValues }
     waterParameters.forEach(parameter => {
@@ -1069,13 +1165,14 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       else if (value != null) customValues[parameter.key] = value
     })
     if (isDemoMode) {
-      const data = { ...payload, id: createLocalId(), created_at: new Date().toISOString(), aquarium_id: 'demo-aquarium', user_id: null }
-      const baseRecords = demoSampleActive ? [] : records
-      const nextRecords = [data, ...baseRecords].slice(0, 365)
+      const existingRecord = records.find(record => record.id === editingWaterId)
+      const data = { ...payload, id: editingWaterId || createLocalId(), created_at: existingRecord?.created_at || new Date().toISOString(), aquarium_id: 'demo-aquarium', user_id: null }
+      const baseRecords = editingWaterId ? records.filter(record => record.id !== editingWaterId) : (demoSampleActive ? [] : records)
+      const nextRecords = sortWaterRecords([data, ...baseRecords]).slice(0, 365)
       setSaveFeedback(buildSaveFeedback(data, baseRecords[0], waterParameters, targetSettings.targets, text, locale))
       setRecords(nextRecords)
       writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)
-      if (demoSampleActive) {
+      if (demoSampleActive && !editingWaterId) {
         writeStorageArray(DEMO_EVENT_LOGS_KEY, [])
         if (typeof window !== 'undefined') {
           window.localStorage.setItem(DEMO_SAMPLE_DISABLED_KEY, 'true')
@@ -1085,18 +1182,55 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         setDemoSampleActive(false)
         setDemoMessage('記録を開始したため、サンプルデータを自分のデータに置き換えました。')
       }
+      setEditingWaterId(null)
+      setValidationWarnings([])
       setWaterForm(current => buildInitialWaterForm(waterParameters, current.measured_at))
       setSavingWater(false)
       return
     }
-    const { data, error } = await supabase.from('water_quality_logs').insert(payload).select('*').single()
+    const query = editingWaterId
+      ? supabase.from('water_quality_logs').update(payload).eq('id', editingWaterId).select('*').single()
+      : supabase.from('water_quality_logs').insert(payload).select('*').single()
+    const { data, error } = await query
     if (error) setError(text.saveWaterError)
     else {
-      setSaveFeedback(buildSaveFeedback(data, records[0], waterParameters, targetSettings.targets, text, locale))
-      setRecords(current => [data, ...current].slice(0, 365))
+      const baseRecords = records.filter(record => record.id !== editingWaterId)
+      setSaveFeedback(buildSaveFeedback(data, baseRecords[0], waterParameters, targetSettings.targets, text, locale))
+      setRecords(current => sortWaterRecords([data, ...current.filter(record => record.id !== data.id)]).slice(0, 365))
+      setEditingWaterId(null)
+      setValidationWarnings([])
       setWaterForm(current => buildInitialWaterForm(waterParameters, current.measured_at))
     }
     setSavingWater(false)
+  }
+
+  function editWaterLog(record) {
+    setEditingWaterId(record.id)
+    setValidationWarnings([])
+    setWaterForm(recordToWaterForm(record, waterParameters))
+  }
+
+  function cancelWaterEdit() {
+    setEditingWaterId(null)
+    setValidationWarnings([])
+    setWaterForm(current => buildInitialWaterForm(waterParameters, current.measured_at))
+  }
+
+  async function deleteWaterLog(record) {
+    if (typeof window !== 'undefined' && !window.confirm(`${record.measured_at} の水質ログを削除しますか？`)) return
+    if (isDemoMode) {
+      const nextRecords = records.filter(item => item.id !== record.id)
+      setRecords(nextRecords)
+      writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)
+      if (editingWaterId === record.id) cancelWaterEdit()
+      return
+    }
+    const { error } = await supabase.from('water_quality_logs').delete().eq('id', record.id)
+    if (error) setError(text.saveWaterError)
+    else {
+      setRecords(current => current.filter(item => item.id !== record.id))
+      if (editingWaterId === record.id) cancelWaterEdit()
+    }
   }
 
   async function addCustomParameter(parameter) {
@@ -1246,21 +1380,59 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       metadata: {},
     }
     if (isDemoMode) {
-      const data = { ...payload, id: createLocalId(), aquarium_id: 'demo-aquarium', user_id: null, created_at: new Date().toISOString() }
-      const nextEvents = [data, ...eventLogs].slice(0, 100)
+      const existingEvent = eventLogs.find(item => item.id === editingEventId)
+      const data = { ...payload, id: editingEventId || createLocalId(), aquarium_id: 'demo-aquarium', user_id: null, created_at: existingEvent?.created_at || new Date().toISOString() }
+      const nextEvents = sortEventLogs([data, ...eventLogs.filter(item => item.id !== data.id)]).slice(0, 100)
       setEventLogs(nextEvents)
       writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)
+      setEditingEventId(null)
       setEventForm(current => ({ ...initialEventForm, event_at: current.event_at, event_type: current.event_type }))
       setSavingEvent(false)
       return
     }
-    const { data, error } = await supabase.from('aquarium_event_logs').insert(payload).select('*').single()
+    const query = editingEventId
+      ? supabase.from('aquarium_event_logs').update(payload).eq('id', editingEventId).select('*').single()
+      : supabase.from('aquarium_event_logs').insert(payload).select('*').single()
+    const { data, error } = await query
     if (error) setError('イベントログを保存できませんでした。')
     else {
-      setEventLogs(current => [data, ...current].slice(0, 100))
+      setEventLogs(current => sortEventLogs([data, ...current.filter(item => item.id !== data.id)]).slice(0, 100))
+      setEditingEventId(null)
       setEventForm(current => ({ ...initialEventForm, event_at: current.event_at, event_type: current.event_type }))
     }
     setSavingEvent(false)
+  }
+
+  function editEventLog(eventLog) {
+    setEditingEventId(eventLog.id)
+    setEventForm({
+      event_at: eventLog.event_at || todayIso(),
+      event_type: eventLog.event_type || 'other',
+      title: eventLog.title || '',
+      notes: eventLog.notes || '',
+    })
+  }
+
+  function cancelEventEdit() {
+    setEditingEventId(null)
+    setEventForm(current => ({ ...initialEventForm, event_at: current.event_at, event_type: current.event_type }))
+  }
+
+  async function deleteEventLog(eventLog) {
+    if (typeof window !== 'undefined' && !window.confirm(`${eventLog.event_at} のイベントログを削除しますか？`)) return
+    if (isDemoMode) {
+      const nextEvents = eventLogs.filter(item => item.id !== eventLog.id)
+      setEventLogs(nextEvents)
+      writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)
+      if (editingEventId === eventLog.id) cancelEventEdit()
+      return
+    }
+    const { error } = await supabase.from('aquarium_event_logs').delete().eq('id', eventLog.id)
+    if (error) setError('イベントログを削除できませんでした。')
+    else {
+      setEventLogs(current => current.filter(item => item.id !== eventLog.id))
+      if (editingEventId === eventLog.id) cancelEventEdit()
+    }
   }
 
   const selectedAquarium = aquariums.find(item => item.id === selectedAquariumId)
@@ -1295,7 +1467,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       <TankDataPanel text={text} locale={locale} aquarium={selectedAquarium} lastWaterChange={lastWaterChange} saving={savingTank} savingTargets={savingTargets} targetSettings={targetSettings} parameters={waterParameters} onSaveVolume={saveTankVolume} onSaveTargets={saveTargetSettings} />
       <TodayTasksPanel tasks={todayTasks} reminders={reminders} />
       <WaterInsightPanel text={text} locale={locale} analysis={waterAnalysis} />
-      <WaterLogForm text={text} parameters={waterParameters} form={waterForm} setForm={setWaterForm} saving={savingWater} latestRecord={records[0]} onSubmit={saveWaterLog} onAddCustomParameter={addCustomParameter} onHideCustomParameter={hideCustomParameter} />
+      <WaterLogForm text={text} parameters={waterParameters} form={waterForm} setForm={setWaterForm} saving={savingWater} latestRecord={records[0]} editingWaterId={editingWaterId} validationWarnings={validationWarnings} onSubmit={saveWaterLog} onCancelEdit={cancelWaterEdit} onAddCustomParameter={addCustomParameter} onHideCustomParameter={hideCustomParameter} />
 
       {!isDemoMode && (
         <>
@@ -1308,12 +1480,13 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         </>
       )}
 
-      <EventLogPanel form={eventForm} setForm={setEventForm} events={eventLogs} saving={savingEvent} onSubmit={saveEventLog} />
+      <EventLogPanel form={eventForm} setForm={setEventForm} events={eventLogs} saving={savingEvent} editingEventId={editingEventId} onSubmit={saveEventLog} onCancelEdit={cancelEventEdit} onEdit={editEventLog} onDelete={deleteEventLog} />
 
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-lg font-bold text-white">{text.waterChart}</h3>
-        <PeriodSwitch text={text} value={periodDays} onChange={setPeriodDays} />
+        <PeriodSwitch value={periodDays} onChange={setPeriodDays} />
       </div>
+      <ExportPanel isDemoMode={isDemoMode} records={records} eventLogs={eventLogs} onExportWater={() => exportWaterLogs(records, waterParameters, text)} onExportEvents={() => exportEventLogs(eventLogs)} />
       <div className="grid lg:grid-cols-2 gap-4">
         {waterParameters.map(parameter => <TrendCard key={parameter.key} text={text} locale={locale} records={records} eventLogs={eventLogs} parameter={parameter} periodDays={periodDays} target={targetRangeFor(parameter, targetSettings.targets)} />)}
       </div>
@@ -1324,7 +1497,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         ))}
       </div>}
 
-      <RecentLists text={text} locale={locale} records={records} doseLogs={doseLogs} loading={loading} error={error} />
+      <RecentLists text={text} locale={locale} records={records} doseLogs={doseLogs} loading={loading} error={error} onEditWater={editWaterLog} onDeleteWater={deleteWaterLog} />
     </section>
   )
 }
@@ -1579,7 +1752,7 @@ function TankDataPanel({ text, locale, aquarium, lastWaterChange, saving, saving
   )
 }
 
-function WaterLogForm({ text, parameters, form, setForm, saving, latestRecord, onSubmit, onAddCustomParameter, onHideCustomParameter }) {
+function WaterLogForm({ text, parameters, form, setForm, saving, latestRecord, editingWaterId, validationWarnings, onSubmit, onCancelEdit, onAddCustomParameter, onHideCustomParameter }) {
   const [customForm, setCustomForm] = useState({ key: '', label: '', unit: '', step: '1', defaultValue: '' })
 
   function adjust(parameter, direction) {
@@ -1613,8 +1786,13 @@ function WaterLogForm({ text, parameters, form, setForm, saving, latestRecord, o
   return (
     <form onSubmit={onSubmit} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <h3 className="text-lg font-bold text-white">{text.todayWater}</h3>
+        <h3 className="text-lg font-bold text-white">{editingWaterId ? '水質ログを編集' : text.todayWater}</h3>
         <div className="flex gap-2">
+          {editingWaterId && (
+            <button type="button" onClick={onCancelEdit} className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-semibold text-slate-300">
+              キャンセル
+            </button>
+          )}
           <button type="button" onClick={copyPreviousValues} disabled={!latestRecord} className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-semibold text-cyan-200 disabled:text-slate-600">
             前回値をコピー
           </button>
@@ -1636,8 +1814,16 @@ function WaterLogForm({ text, parameters, form, setForm, saving, latestRecord, o
           </div>
         ))}
       </div>
+      {validationWarnings?.length > 0 && (
+        <div className="mt-3 rounded-md border border-amber-700 bg-amber-950/50 p-3">
+          <p className="text-sm font-semibold text-amber-100">保存前に確認した値</p>
+          <ul className="mt-2 space-y-1 text-xs text-amber-100/90">
+            {validationWarnings.map(warning => <li key={warning}>{warning}</li>)}
+          </ul>
+        </div>
+      )}
       <textarea rows={2} value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} placeholder={text.waterNotes} className="mt-3 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white resize-none" />
-      <button type="submit" disabled={saving} className="sticky bottom-3 z-10 w-full bg-cyan-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-4 mt-3 shadow-lg shadow-slate-950/40 sm:static sm:py-3 sm:shadow-none">{saving ? text.saving : text.saveWater}</button>
+      <button type="submit" disabled={saving} className="sticky bottom-3 z-10 w-full bg-cyan-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-4 mt-3 shadow-lg shadow-slate-950/40 sm:static sm:py-3 sm:shadow-none">{saving ? text.saving : (editingWaterId ? '水質ログを更新' : text.saveWater)}</button>
 
       <div className="mt-5 pt-4 border-t border-slate-800">
         <p className="text-sm font-bold text-white">カスタム項目</p>
@@ -1772,7 +1958,28 @@ function AdditiveDoseForm({ text, locale, additives, inventory, form, setForm, s
   )
 }
 
-function EventLogPanel({ form, setForm, events, saving, onSubmit }) {
+function ExportPanel({ isDemoMode, records, eventLogs, onExportWater, onExportEvents }) {
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-bold text-white">CSVバックアップ</p>
+          <p className="text-xs text-slate-400 mt-1">{isDemoMode ? 'デモモードではCSVでバックアップできます。' : '水質ログとイベントログを外部に保存できます。'}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:flex">
+          <button type="button" onClick={onExportWater} disabled={!records.length} className="rounded-md bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 disabled:bg-slate-700 disabled:text-slate-400">
+            水質CSV
+          </button>
+          <button type="button" onClick={onExportEvents} disabled={!eventLogs.length} className="rounded-md border border-slate-700 px-4 py-3 text-sm font-bold text-cyan-100 disabled:text-slate-600">
+            イベントCSV
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EventLogPanel({ form, setForm, events, saving, editingEventId, onSubmit, onCancelEdit, onEdit, onDelete }) {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
       <div className="flex items-center justify-between gap-3">
@@ -1790,20 +1997,31 @@ function EventLogPanel({ form, setForm, events, saving, onSubmit }) {
           <input value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder="例: スキマー清掃、照明を1時間短縮" className="bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
         </div>
         <input value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} placeholder="メモ" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
-        <button type="submit" disabled={saving || !form.title.trim()} className="w-full bg-violet-300 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-3">
-          {saving ? '保存中...' : 'イベントを記録'}
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {editingEventId && <button type="button" onClick={onCancelEdit} className="sm:w-40 rounded-md border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-300">キャンセル</button>}
+          <button type="submit" disabled={saving || !form.title.trim()} className="w-full bg-violet-300 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-3">
+            {saving ? '保存中...' : (editingEventId ? 'イベントを更新' : 'イベントを記録')}
+          </button>
+        </div>
       </form>
       <div className="mt-4 divide-y divide-slate-800">
         {events.slice(0, 8).map(event => {
           const type = EVENT_TYPES.find(item => item.value === event.event_type)
           return (
             <div key={event.id} className="py-3">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-slate-950 border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300">{type?.label || event.event_type}</span>
-                <p className="text-sm font-semibold text-white">{event.event_at} / {event.title}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-slate-950 border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300">{type?.label || event.event_type}</span>
+                    <p className="text-sm font-semibold text-white">{event.event_at} / {event.title}</p>
+                  </div>
+                  {event.notes && <p className="text-xs text-slate-500 mt-1">{event.notes}</p>}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button type="button" onClick={() => onEdit(event)} className="rounded-md border border-slate-700 px-2 py-1 text-xs text-cyan-200">編集</button>
+                  <button type="button" onClick={() => onDelete(event)} className="rounded-md border border-rose-900 px-2 py-1 text-xs text-rose-200">削除</button>
+                </div>
               </div>
-              {event.notes && <p className="text-xs text-slate-500 mt-1">{event.notes}</p>}
             </div>
           )
         })}
@@ -1821,8 +2039,14 @@ function groupByBrand(additives) {
   }, {})
 }
 
-function PeriodSwitch({ text, value, onChange }) {
-  return <div className="flex gap-2">{[7, 30].map(days => <button key={days} type="button" onClick={() => onChange(days)} className={`text-xs px-3 py-2 rounded-md border ${value === days ? 'border-cyan-500 bg-cyan-950 text-cyan-200' : 'border-slate-700 text-slate-400'}`}>{days === 7 ? text.week : text.month}</button>)}</div>
+function PeriodSwitch({ value, onChange }) {
+  const options = [
+    { value: 7, label: '7日' },
+    { value: 30, label: '30日' },
+    { value: 90, label: '90日' },
+    { value: 'all', label: '全期間' },
+  ]
+  return <div className="flex flex-wrap gap-2">{options.map(option => <button key={option.value} type="button" onClick={() => onChange(option.value)} className={`text-xs px-3 py-2 rounded-md border ${value === option.value ? 'border-cyan-500 bg-cyan-950 text-cyan-200' : 'border-slate-700 text-slate-400'}`}>{option.label}</button>)}</div>
 }
 
 function TrendCard({ text, locale, records, eventLogs, parameter, periodDays, target }) {
@@ -1845,32 +2069,39 @@ function TrendCard({ text, locale, records, eventLogs, parameter, periodDays, ta
 
 function AdditiveTrendCard({ text, locale, product, logs, periodDays }) {
   const points = useMemo(() => {
-    const start = new Date()
-    start.setHours(0, 0, 0, 0)
-    start.setDate(start.getDate() - periodDays + 1)
     const daily = new Map()
-    logs.filter(log => log.additive_product_id === product.id && new Date(`${log.dosed_at}T00:00:00`) >= start).forEach(log => {
+    const start = periodStart(periodDays)
+    logs.filter(log => {
+      if (log.additive_product_id !== product.id) return false
+      return !start || new Date(`${log.dosed_at}T00:00:00`) >= start
+    }).forEach(log => {
       daily.set(log.dosed_at, (daily.get(log.dosed_at) || 0) + Number(log.amount))
     })
     return [...daily.entries()].map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date))
   }, [logs, product.id, periodDays])
 
-  return <ChartCard title={`${product.brand} ${product.name}`} subtitle={product.category} color="#34d399" points={points} unit={product.default_unit} text={text} locale={locale} />
+  return <ChartCard title={`${product.brand} ${product.name}`} subtitle={product.category} color="#34d399" points={points} periodDays={periodDays} unit={product.default_unit} text={text} locale={locale} />
 }
 
 function useChartPoints(records, key, periodDays) {
   return useMemo(() => {
-    const start = new Date()
-    start.setHours(0, 0, 0, 0)
-    start.setDate(start.getDate() - periodDays + 1)
+    const start = periodStart(periodDays)
     return records
       .filter(record => {
         const value = record[key] ?? record.custom_values?.[key]
-        return new Date(`${record.measured_at}T00:00:00`) >= start && value != null
+        return (!start || new Date(`${record.measured_at}T00:00:00`) >= start) && value != null
       })
       .map(record => ({ date: record.measured_at, value: Number(record[key] ?? record.custom_values?.[key]) }))
       .reverse()
   }, [records, key, periodDays])
+}
+
+function periodStart(periodDays) {
+  if (periodDays === 'all') return null
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() - Number(periodDays) + 1)
+  return start
 }
 
 function eventLabel(eventType) {
@@ -1887,11 +2118,9 @@ function eventMarkerColor(eventType) {
 }
 
 function eventsInPeriod(eventLogs, periodDays) {
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  start.setDate(start.getDate() - periodDays + 1)
+  const start = periodStart(periodDays)
   return eventLogs
-    .filter(event => new Date(`${event.event_at}T00:00:00`) >= start)
+    .filter(event => !start || new Date(`${event.event_at}T00:00:00`) >= start)
     .sort((a, b) => a.event_at.localeCompare(b.event_at))
 }
 
@@ -1901,17 +2130,18 @@ function ChartCard({ title, subtitle, color, points, eventLogs = [], periodDays 
   const maxValue = values.length ? Math.max(...values, maxGuide ?? values[0]) : maxGuide ?? 1
   const range = maxValue - minValue || 1
   const x = index => 8 + (index / Math.max(points.length - 1, 1)) * 84
+  const markers = eventsInPeriod(eventLogs, periodDays)
+  const dateTexts = [...points.map(point => point.date), ...markers.map(event => event.event_at)].filter(Boolean).sort()
+  const chartStart = periodDays === 'all' && dateTexts.length ? new Date(`${dateTexts[0]}T00:00:00`) : periodStart(periodDays)
+  const chartEnd = periodDays === 'all' && dateTexts.length ? new Date(`${dateTexts[dateTexts.length - 1]}T00:00:00`) : new Date()
+  const chartSpanDays = Math.max(1, Math.floor((chartEnd - chartStart) / 86400000))
   const xDate = dateText => {
-    const start = new Date()
-    start.setHours(0, 0, 0, 0)
-    start.setDate(start.getDate() - periodDays + 1)
     const date = new Date(`${dateText}T00:00:00`)
-    const dayIndex = Math.max(0, Math.min(periodDays - 1, Math.floor((date - start) / 86400000)))
-    return 8 + (dayIndex / Math.max(periodDays - 1, 1)) * 84
+    const dayIndex = Math.max(0, Math.min(chartSpanDays, Math.floor((date - chartStart) / 86400000)))
+    return 8 + (dayIndex / chartSpanDays) * 84
   }
   const y = value => 88 - ((value - minValue) / range) * 76
   const path = points.map((point, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(point.value)}`).join(' ')
-  const markers = eventsInPeriod(eventLogs, periodDays)
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
@@ -1960,7 +2190,7 @@ function Stat({ label, value, unit, locale }) {
   return <div className="bg-slate-950 border border-slate-800 rounded-md p-3"><p className="text-[11px] text-slate-500">{label}</p><p className="text-sm font-bold text-white mt-1">{value == null ? '-' : formatValue(Number(value.toFixed(3)), unit, locale)}</p></div>
 }
 
-function RecentLists({ text, locale, records, doseLogs, loading, error }) {
+function RecentLists({ text, locale, records, doseLogs, loading, error, onEditWater, onDeleteWater }) {
   const emptyWater = error ? (
     <span className="text-rose-300">水質記録の読み込みでエラーが発生しました。</span>
   ) : (
@@ -1970,10 +2200,17 @@ function RecentLists({ text, locale, records, doseLogs, loading, error }) {
   return (
     <div className="grid lg:grid-cols-2 gap-4">
       <RecentPanel title={text.recentWaterRecords} emptyText={loading ? text.loading : emptyWater} items={records.slice(0, 8)} renderItem={record => (
-        <>
-          <p className="text-sm font-semibold text-white">{record.measured_at}</p>
-          <p className="text-xs text-slate-400 mt-1">{text.parameters.temperature} {formatValue(getRecordValue(record, 'temperature'), '°C', locale)} / KH {formatValue(getRecordValue(record, 'kh'), 'dKH', locale)} / NO3 {formatValue(getRecordValue(record, 'nitrate'), 'ppm', locale)}</p>
-        </>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-white">{record.measured_at}</p>
+            <p className="text-xs text-slate-400 mt-1">{text.parameters.temperature} {formatValue(getRecordValue(record, 'temperature'), '℃', locale)} / KH {formatValue(getRecordValue(record, 'kh'), 'dKH', locale)} / NO3 {formatValue(getRecordValue(record, 'nitrate'), 'ppm', locale)}</p>
+            {record.notes && <p className="text-xs text-slate-500 mt-1">{record.notes}</p>}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" onClick={() => onEditWater(record)} className="rounded-md border border-slate-700 px-2 py-1 text-xs text-cyan-200">編集</button>
+            <button type="button" onClick={() => onDeleteWater(record)} className="rounded-md border border-rose-900 px-2 py-1 text-xs text-rose-200">削除</button>
+          </div>
+        </div>
       )} />
       <RecentPanel title={text.recentDoseRecords} emptyText={text.noDoseRecords} items={doseLogs.slice(0, 8)} renderItem={log => (
         <>
