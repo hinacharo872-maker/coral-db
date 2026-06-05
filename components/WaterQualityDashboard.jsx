@@ -384,6 +384,16 @@ const ACTION_SUGGESTIONS = {
   phosphate: '給餌量、吸着剤、スキマー、換水、冷凍餌のすすぎを確認してください。',
 }
 
+const REMINDER_FREQUENCIES = {
+  kh: { days: 2, label: 'KH' },
+  ph: { days: 3, label: 'pH' },
+  salinity: { days: 3, label: '比重' },
+  nitrate: { days: 7, label: 'NO3' },
+  phosphate: { days: 7, label: 'PO4' },
+  calcium: { days: 7, label: 'Ca' },
+  magnesium: { days: 14, label: 'Mg' },
+}
+
 const EVENT_TYPES = [
   { value: 'dosing', label: '添加' },
   { value: 'water_change', label: '水換え' },
@@ -575,6 +585,80 @@ function buildWaterAnalysis(records, parameters, targets, text) {
   return { latest, previous, items, dangerCount, cautionCount, topActions }
 }
 
+function daysSince(dateText) {
+  if (!dateText) return null
+  const today = new Date(`${todayIso()}T00:00:00`)
+  const target = new Date(`${dateText}T00:00:00`)
+  if (Number.isNaN(target.getTime())) return null
+  return Math.max(0, Math.floor((today - target) / 86400000))
+}
+
+function latestMeasurementDate(records, key) {
+  const record = records.find(item => getRecordValue(item, key) != null)
+  return record?.measured_at || null
+}
+
+function buildReminders(records) {
+  return Object.entries(REMINDER_FREQUENCIES).map(([key, frequency]) => {
+    const lastDate = latestMeasurementDate(records, key)
+    const elapsedDays = daysSince(lastDate)
+    const due = elapsedDays == null || elapsedDays >= frequency.days
+    return { key, ...frequency, lastDate, elapsedDays, due }
+  })
+}
+
+function buildTodayTasks(analysis, reminders, eventLogs) {
+  const tasks = []
+  const dueReminders = reminders.filter(reminder => reminder.due)
+  const latestAge = daysSince(analysis.latest?.measured_at)
+
+  if (dueReminders.some(reminder => reminder.key === 'kh')) {
+    tasks.push({ type: 'measure', level: 'danger', title: 'KHを測定しましょう', detail: 'KHは2日に1回の確認をおすすめします。' })
+  } else if (dueReminders.length) {
+    const labels = dueReminders.slice(0, 2).map(reminder => reminder.label).join(' / ')
+    tasks.push({ type: 'measure', level: 'caution', title: `${labels}を測定しましょう`, detail: '前回測定から推奨間隔を過ぎています。' })
+  }
+
+  const po4 = analysis.items.find(item => item.key === 'phosphate' && item.severity !== 'normal')
+  if (po4) tasks.push({ type: 'quality', level: po4.severity, title: 'PO4が高めなので給餌量を確認', detail: po4.suggestion })
+
+  const no3 = analysis.items.find(item => item.key === 'nitrate' && item.severity !== 'normal')
+  if (no3) tasks.push({ type: 'quality', level: no3.severity, title: 'NO3の上昇傾向を確認', detail: no3.suggestion })
+
+  const kh = analysis.items.find(item => item.key === 'kh' && item.severity !== 'normal')
+  if (kh) tasks.push({ type: 'quality', level: kh.severity, title: 'KHの変動を確認', detail: kh.suggestion })
+
+  if (latestAge != null && latestAge >= 3) {
+    tasks.push({ type: 'stale', level: 'caution', title: `前回から${latestAge}日経過しています`, detail: '今日は主要項目だけでも記録しておくと変化に気づきやすくなります。' })
+  }
+
+  const recentEvent = eventLogs[0]
+  if (recentEvent && daysSince(recentEvent.event_at) <= 2) {
+    tasks.push({ type: 'event', level: 'normal', title: `${recentEvent.title}後の変化を確認`, detail: 'イベント後の水質変化をグラフで見てください。' })
+  }
+
+  if (!tasks.length) {
+    tasks.push({ type: 'steady', level: 'normal', title: '今日は大きな異常はありません', detail: 'KHや生体の様子だけ短く確認しましょう。' })
+  }
+
+  return tasks.slice(0, 5)
+}
+
+function buildSaveFeedback(savedRecord, previousRecord, parameters, targets, text, locale) {
+  const parts = []
+  parameters.slice(0, 8).forEach(parameter => {
+    const current = getRecordValue(savedRecord, parameter.key)
+    if (current == null) return
+    const previous = getRecordValue(previousRecord, parameter.key)
+    const target = targetRangeFor(parameter, targets)
+    const delta = previous != null ? current - previous : null
+    const inRange = (target.min == null || current >= target.min) && (target.max == null || current <= target.max)
+    const deltaText = delta == null ? '初回記録' : `前回より${delta >= 0 ? '+' : ''}${formatValue(Number(delta.toFixed(3)), parameter.unit, locale)}`
+    parts.push(`${labelFor(parameter, text)}は${deltaText}、${inRange ? '目標範囲内です' : '目標範囲外です'}`)
+  })
+  return parts.length ? `記録しました。${parts.slice(0, 3).join('。')}。` : '記録しました。次回から前回差分を表示します。'
+}
+
 function readStorageArray(key) {
   if (typeof window === 'undefined') return []
   try {
@@ -686,6 +770,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   const [email, setEmail] = useState('')
   const [authMessage, setAuthMessage] = useState('')
   const [demoMessage, setDemoMessage] = useState('')
+  const [saveFeedback, setSaveFeedback] = useState('')
   const [demoSampleActive, setDemoSampleActive] = useState(false)
   const [aquariums, setAquariums] = useState([])
   const [selectedAquariumId, setSelectedAquariumId] = useState('')
@@ -975,6 +1060,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     event.preventDefault()
     setSavingWater(true)
     setError(null)
+    setSaveFeedback('')
     const customValues = {}
     const payload = { aquarium_id: selectedAquariumId, user_id: session?.user?.id, measured_at: waterForm.measured_at, notes: waterForm.notes.trim() || null, custom_values: customValues }
     waterParameters.forEach(parameter => {
@@ -986,6 +1072,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       const data = { ...payload, id: createLocalId(), created_at: new Date().toISOString(), aquarium_id: 'demo-aquarium', user_id: null }
       const baseRecords = demoSampleActive ? [] : records
       const nextRecords = [data, ...baseRecords].slice(0, 365)
+      setSaveFeedback(buildSaveFeedback(data, baseRecords[0], waterParameters, targetSettings.targets, text, locale))
       setRecords(nextRecords)
       writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)
       if (demoSampleActive) {
@@ -1005,6 +1092,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     const { data, error } = await supabase.from('water_quality_logs').insert(payload).select('*').single()
     if (error) setError(text.saveWaterError)
     else {
+      setSaveFeedback(buildSaveFeedback(data, records[0], waterParameters, targetSettings.targets, text, locale))
       setRecords(current => [data, ...current].slice(0, 365))
       setWaterForm(current => buildInitialWaterForm(waterParameters, current.measured_at))
     }
@@ -1180,12 +1268,15 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   const lastWaterChange = waterChanges[0]
   const targetSettings = getTargetSettings(selectedAquarium)
   const waterAnalysis = buildWaterAnalysis(records, waterParameters, targetSettings.targets, text)
+  const reminders = buildReminders(records)
+  const todayTasks = buildTodayTasks(waterAnalysis, reminders, eventLogs)
 
   return (
     <section className="space-y-5 pb-10">
       {isDemoMode && <DemoModePanel text={text} email={email} authMessage={authMessage} demoSampleActive={demoSampleActive} setEmail={setEmail} sendMagicLink={sendMagicLink} onDeleteDemoSamples={deleteDemoSamples} />}
       {error && <div className="border border-rose-800 bg-rose-950/50 rounded-lg p-4 text-rose-100 text-sm">{error}</div>}
       {demoMessage && <div className="border border-emerald-800 bg-emerald-950/50 rounded-lg p-4 text-emerald-100 text-sm">{demoMessage}</div>}
+      {saveFeedback && <div className="border border-emerald-700 bg-emerald-950/60 rounded-lg p-4 text-emerald-100 text-sm font-semibold">{saveFeedback}</div>}
       {lowStockItems.length > 0 && <LowStockAlert text={text} locale={locale} items={lowStockItems} />}
 
       <div className="flex items-center justify-between gap-3">
@@ -1202,6 +1293,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       </div>
 
       <TankDataPanel text={text} locale={locale} aquarium={selectedAquarium} lastWaterChange={lastWaterChange} saving={savingTank} savingTargets={savingTargets} targetSettings={targetSettings} parameters={waterParameters} onSaveVolume={saveTankVolume} onSaveTargets={saveTargetSettings} />
+      <TodayTasksPanel tasks={todayTasks} reminders={reminders} />
       <WaterInsightPanel text={text} locale={locale} analysis={waterAnalysis} />
       <WaterLogForm text={text} parameters={waterParameters} form={waterForm} setForm={setWaterForm} saving={savingWater} latestRecord={records[0]} onSubmit={saveWaterLog} onAddCustomParameter={addCustomParameter} onHideCustomParameter={hideCustomParameter} />
 
@@ -1223,7 +1315,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         <PeriodSwitch text={text} value={periodDays} onChange={setPeriodDays} />
       </div>
       <div className="grid lg:grid-cols-2 gap-4">
-        {waterParameters.map(parameter => <TrendCard key={parameter.key} text={text} locale={locale} records={records} parameter={parameter} periodDays={periodDays} target={targetRangeFor(parameter, targetSettings.targets)} />)}
+        {waterParameters.map(parameter => <TrendCard key={parameter.key} text={text} locale={locale} records={records} eventLogs={eventLogs} parameter={parameter} periodDays={periodDays} target={targetRangeFor(parameter, targetSettings.targets)} />)}
       </div>
 
       {!isDemoMode && <div className="grid lg:grid-cols-2 gap-4">
@@ -1301,6 +1393,53 @@ function SeverityPill({ severity }) {
       : 'border-emerald-600 bg-emerald-950 text-emerald-100'
   const label = severity === 'danger' ? '危険' : severity === 'caution' ? '注意' : '正常'
   return <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${style}`}>{label}</span>
+}
+
+function taskStyle(level) {
+  if (level === 'danger') return 'border-rose-700 bg-rose-950/60 text-rose-100'
+  if (level === 'caution') return 'border-amber-600 bg-amber-950/60 text-amber-100'
+  return 'border-emerald-700 bg-emerald-950/40 text-emerald-100'
+}
+
+function TodayTasksPanel({ tasks, reminders }) {
+  return (
+    <div className="grid lg:grid-cols-[1.4fr_1fr] gap-4">
+      <section className="rounded-lg border border-cyan-800 bg-slate-900 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold text-cyan-300">DAILY REEF CHECK</p>
+            <h3 className="text-xl font-bold text-white mt-1">今日やること</h3>
+          </div>
+          <span className="rounded-full bg-cyan-400 px-3 py-1 text-xs font-bold text-slate-950">{tasks.length}件</span>
+        </div>
+        <div className="mt-3 space-y-2">
+          {tasks.map((task, index) => (
+            <div key={`${task.type}-${index}`} className={`rounded-md border px-3 py-3 ${taskStyle(task.level)}`}>
+              <p className="text-sm font-bold">{task.title}</p>
+              <p className="text-xs opacity-80 mt-1">{task.detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+        <h3 className="text-sm font-bold text-white">測定リマインダー</h3>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {reminders.slice(0, 6).map(reminder => (
+            <div key={reminder.key} className={`rounded-md border p-2 ${reminder.due ? 'border-amber-700 bg-amber-950/40' : 'border-slate-800 bg-slate-950'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-white">{reminder.label}</p>
+                <span className={`text-[10px] font-bold ${reminder.due ? 'text-amber-200' : 'text-emerald-200'}`}>{reminder.days}日毎</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {reminder.elapsedDays == null ? '未測定' : `前回から${reminder.elapsedDays}日`}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
 }
 
 function WaterInsightPanel({ text, locale, analysis }) {
@@ -1498,7 +1637,7 @@ function WaterLogForm({ text, parameters, form, setForm, saving, latestRecord, o
         ))}
       </div>
       <textarea rows={2} value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} placeholder={text.waterNotes} className="mt-3 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white resize-none" />
-      <button type="submit" disabled={saving} className="w-full bg-cyan-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-3 mt-3">{saving ? text.saving : text.saveWater}</button>
+      <button type="submit" disabled={saving} className="sticky bottom-3 z-10 w-full bg-cyan-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-4 mt-3 shadow-lg shadow-slate-950/40 sm:static sm:py-3 sm:shadow-none">{saving ? text.saving : text.saveWater}</button>
 
       <div className="mt-5 pt-4 border-t border-slate-800">
         <p className="text-sm font-bold text-white">カスタム項目</p>
@@ -1686,14 +1825,14 @@ function PeriodSwitch({ text, value, onChange }) {
   return <div className="flex gap-2">{[7, 30].map(days => <button key={days} type="button" onClick={() => onChange(days)} className={`text-xs px-3 py-2 rounded-md border ${value === days ? 'border-cyan-500 bg-cyan-950 text-cyan-200' : 'border-slate-700 text-slate-400'}`}>{days === 7 ? text.week : text.month}</button>)}</div>
 }
 
-function TrendCard({ text, locale, records, parameter, periodDays, target }) {
+function TrendCard({ text, locale, records, eventLogs, parameter, periodDays, target }) {
   const points = useChartPoints(records, parameter.key, periodDays)
   const values = points.map(point => point.value)
   const label = labelFor(parameter, text)
   const latestValue = values.length ? values[values.length - 1] : null
 
   return (
-    <ChartCard title={label} subtitle={`目標 ${formatValue(target.min, parameter.unit, locale)} - ${formatValue(target.max, parameter.unit, locale)}`} color={parameter.color} points={points} unit={parameter.unit} minGuide={target.min} maxGuide={target.max} text={text} locale={locale}>
+    <ChartCard title={label} subtitle={`目標 ${formatValue(target.min, parameter.unit, locale)} - ${formatValue(target.max, parameter.unit, locale)}`} color={parameter.color} points={points} eventLogs={eventLogs} periodDays={periodDays} unit={parameter.unit} minGuide={target.min} maxGuide={target.max} text={text} locale={locale}>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
         <Stat label={text.latest} value={latestValue} unit={parameter.unit} locale={locale} />
         <Stat label={text.average} value={average(values)} unit={parameter.unit} locale={locale} />
@@ -1734,14 +1873,45 @@ function useChartPoints(records, key, periodDays) {
   }, [records, key, periodDays])
 }
 
-function ChartCard({ title, subtitle, color, points, unit, minGuide, maxGuide, children, text, locale }) {
+function eventLabel(eventType) {
+  return EVENT_TYPES.find(type => type.value === eventType)?.label || eventType
+}
+
+function eventMarkerColor(eventType) {
+  if (eventType === 'water_change') return '#38bdf8'
+  if (eventType === 'dosing') return '#34d399'
+  if (eventType === 'feeding_change') return '#f59e0b'
+  if (eventType === 'lighting_change') return '#a78bfa'
+  if (eventType === 'livestock_added') return '#fb7185'
+  return '#cbd5e1'
+}
+
+function eventsInPeriod(eventLogs, periodDays) {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() - periodDays + 1)
+  return eventLogs
+    .filter(event => new Date(`${event.event_at}T00:00:00`) >= start)
+    .sort((a, b) => a.event_at.localeCompare(b.event_at))
+}
+
+function ChartCard({ title, subtitle, color, points, eventLogs = [], periodDays = 7, unit, minGuide, maxGuide, children, text, locale }) {
   const values = points.map(point => point.value)
   const minValue = values.length ? Math.min(...values, minGuide ?? values[0]) : minGuide ?? 0
   const maxValue = values.length ? Math.max(...values, maxGuide ?? values[0]) : maxGuide ?? 1
   const range = maxValue - minValue || 1
   const x = index => 8 + (index / Math.max(points.length - 1, 1)) * 84
+  const xDate = dateText => {
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - periodDays + 1)
+    const date = new Date(`${dateText}T00:00:00`)
+    const dayIndex = Math.max(0, Math.min(periodDays - 1, Math.floor((date - start) / 86400000)))
+    return 8 + (dayIndex / Math.max(periodDays - 1, 1)) * 84
+  }
   const y = value => 88 - ((value - minValue) / range) * 76
   const path = points.map((point, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(point.value)}`).join(' ')
+  const markers = eventsInPeriod(eventLogs, periodDays)
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
@@ -1756,9 +1926,26 @@ function ChartCard({ title, subtitle, color, points, unit, minGuide, maxGuide, c
             {[0, 1, 2, 3, 4].map(index => <line key={index} x1="8" x2="92" y1={12 + index * 19} y2={12 + index * 19} stroke="#334155" strokeWidth="0.3" />)}
             <path d={path} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             {points.map((point, index) => <circle key={`${point.date}-${index}`} cx={x(index)} cy={y(point.value)} r="1.8" fill={color} />)}
+            {markers.map((event, index) => (
+              <g key={`${event.id}-${index}`} tabIndex="0">
+                <line x1={xDate(event.event_at)} x2={xDate(event.event_at)} y1="14" y2="92" stroke={eventMarkerColor(event.event_type)} strokeWidth="0.5" strokeDasharray="1.5 1.5" opacity="0.8" />
+                <circle cx={xDate(event.event_at)} cy="92" r="2.4" fill={eventMarkerColor(event.event_type)}>
+                  <title>{`${event.event_at} ${eventLabel(event.event_type)}: ${event.title}${event.notes ? ` / ${event.notes}` : ''}`}</title>
+                </circle>
+              </g>
+            ))}
           </svg>
         ) : <div className="h-full flex flex-col items-center justify-center px-4 text-center text-sm text-slate-500"><p>{text.noRecords}</p><p className="mt-1 text-xs">まずはKHだけでも記録すると、推移と目標レンジが見えるようになります。</p></div>}
       </div>
+      {markers.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {markers.slice(0, 4).map(event => (
+            <span key={event.id} className="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[10px] text-slate-300" title={event.notes || event.title}>
+              {event.event_at.slice(5)} {eventLabel(event.event_type)}
+            </span>
+          ))}
+        </div>
+      )}
       {children}
       {points.length > 0 && <p className="text-xs text-slate-500 mt-3">{text.latest}: {points[points.length - 1].date} / {formatValue(points[points.length - 1].value, unit, locale)}</p>}
     </div>
