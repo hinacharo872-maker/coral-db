@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import CoralCard from '@/components/CoralCard'
+import CoralCleanupDashboard from '@/components/CoralCleanupDashboard'
 import CoralIdentityDashboard from '@/components/CoralIdentityDashboard'
 import CoralQualityDashboard from '@/components/CoralQualityDashboard'
 import Header from '@/components/Header'
@@ -17,7 +18,7 @@ const LANGUAGES = [
 
 const PAGE_TEXT = {
   ja: {
-    tabs: { water: '水質管理', coral: 'サンゴDB', identity: 'DB整理', quality: 'DB品質' },
+    tabs: { water: '水質管理', coral: 'サンゴDB', identity: 'DB整理', cleanup: '追加整理', quality: 'DB品質' },
     language: '言語',
     heroKicker: 'Marine aquarium manager',
     heroTitle: 'Aqua Reef Log',
@@ -38,7 +39,7 @@ const PAGE_TEXT = {
     showing: (total, loaded, filtered) => `全 ${total} 件中、先頭 ${loaded} 件から ${filtered} 件表示`,
   },
   en: {
-    tabs: { water: 'Water Log', coral: 'Coral DB', identity: 'DB Cleanup', quality: 'DB Quality' },
+    tabs: { water: 'Water Log', coral: 'Coral DB', identity: 'DB Cleanup', cleanup: 'More Cleanup', quality: 'DB Quality' },
     language: 'Language',
     heroKicker: 'Marine aquarium manager',
     heroTitle: 'Aqua Reef Log',
@@ -59,7 +60,7 @@ const PAGE_TEXT = {
     showing: (total, loaded, filtered) => `Showing ${filtered} from the first ${loaded} of ${total} records`,
   },
   de: {
-    tabs: { water: 'Wasserwerte', coral: 'Korallen-DB', identity: 'DB-Bereinigung', quality: 'DB-Qualität' },
+    tabs: { water: 'Wasserwerte', coral: 'Korallen-DB', identity: 'DB-Bereinigung', cleanup: 'Weitere Bereinigung', quality: 'DB-Qualität' },
     language: 'Sprache',
     heroKicker: 'Meerwasser-Aquarium-Manager',
     heroTitle: 'Aqua Reef Log',
@@ -80,7 +81,7 @@ const PAGE_TEXT = {
     showing: (total, loaded, filtered) => `${filtered} Treffer aus den ersten ${loaded} von ${total} Datensätzen`,
   },
   zh: {
-    tabs: { water: '水质管理', coral: '珊瑚数据库', identity: '数据库整理', quality: '数据库质量' },
+    tabs: { water: '水质管理', coral: '珊瑚数据库', identity: '数据库整理', cleanup: '追加整理', quality: '数据库质量' },
     language: '语言',
     heroKicker: '海水水族箱管理',
     heroTitle: 'Aqua Reef Log',
@@ -103,7 +104,7 @@ const PAGE_TEXT = {
 }
 
 const NUMBER_LOCALE = { ja: 'ja-JP', en: 'en-US', de: 'de-DE', zh: 'zh-CN' }
-const TABS = ['water', 'coral', 'identity', 'quality']
+const TABS = ['water', 'coral', 'identity', 'cleanup', 'quality']
 
 export default function Home() {
   const [records, setRecords] = useState([])
@@ -228,6 +229,7 @@ export default function Home() {
 
         {activeView === 'water' && <WaterQualityDashboard locale={locale} />}
         {activeView === 'identity' && <CoralIdentityDashboard />}
+        {activeView === 'cleanup' && <CoralCleanupDashboard locale={locale} />}
         {activeView === 'quality' && <CoralQualityDashboard />}
         {activeView === 'coral' && (
           <CoralBrowser
