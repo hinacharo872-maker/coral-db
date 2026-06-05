@@ -307,6 +307,93 @@ const PARAMETERS = [
   { key: 'phosphate', unit: 'ppm', min: 0.02, max: 0.08, step: '0.01', defaultValue: 0.04, color: '#fb7185' },
 ]
 
+const TARGET_PRESETS = {
+  sps: {
+    label: 'SPSメイン',
+    targets: {
+      temperature: { min: 24.5, max: 26.5 },
+      salinity: { min: 1.024, max: 1.026 },
+      ph: { min: 8.0, max: 8.4 },
+      kh: { min: 7.5, max: 8.8 },
+      calcium: { min: 400, max: 450 },
+      magnesium: { min: 1280, max: 1400 },
+      nitrate: { min: 0.5, max: 10 },
+      phosphate: { min: 0.02, max: 0.08 },
+    },
+  },
+  lps: {
+    label: 'LPS混泳',
+    targets: {
+      temperature: { min: 24, max: 27 },
+      salinity: { min: 1.023, max: 1.026 },
+      ph: { min: 7.9, max: 8.4 },
+      kh: { min: 7.5, max: 9.5 },
+      calcium: { min: 390, max: 460 },
+      magnesium: { min: 1250, max: 1400 },
+      nitrate: { min: 2, max: 15 },
+      phosphate: { min: 0.03, max: 0.1 },
+    },
+  },
+  soft: {
+    label: 'ソフトコーラル',
+    targets: {
+      temperature: { min: 24, max: 27 },
+      salinity: { min: 1.023, max: 1.026 },
+      ph: { min: 7.9, max: 8.4 },
+      kh: { min: 7, max: 10 },
+      calcium: { min: 380, max: 460 },
+      magnesium: { min: 1200, max: 1400 },
+      nitrate: { min: 2, max: 20 },
+      phosphate: { min: 0.03, max: 0.12 },
+    },
+  },
+  fish: {
+    label: '魚多め',
+    targets: {
+      temperature: { min: 24, max: 27 },
+      salinity: { min: 1.021, max: 1.026 },
+      ph: { min: 7.8, max: 8.4 },
+      kh: { min: 7, max: 10 },
+      calcium: { min: 360, max: 460 },
+      magnesium: { min: 1150, max: 1450 },
+      nitrate: { min: 0, max: 25 },
+      phosphate: { min: 0, max: 0.15 },
+    },
+  },
+}
+
+const ANALYSIS_RULES = {
+  temperature: { cautionDelta: 1.0, dangerDelta: 2.0 },
+  salinity: { cautionDelta: 0.001, dangerDelta: 0.002 },
+  ph: { cautionLow: 7.9, dangerLow: 7.8, cautionHigh: 8.45, dangerHigh: 8.5, cautionDelta: 0.2, dangerDelta: 0.35 },
+  kh: { cautionDelta: 0.5, dangerDelta: 1.0 },
+  calcium: { cautionDelta: 25, dangerDelta: 50 },
+  magnesium: { cautionDelta: 50, dangerDelta: 100 },
+  nitrate: { cautionHigh: 15, dangerHigh: 25 },
+  phosphate: { cautionHigh: 0.08, dangerHigh: 0.1 },
+}
+
+const ACTION_SUGGESTIONS = {
+  temperature: 'ヒーター、クーラー、室温、センサー位置を確認してください。',
+  salinity: '比重計の校正、足し水、塩だれ、換水時の比重を確認してください。',
+  ph: '測定時間、換気、KH、CO2、校正液を確認してください。',
+  kh: '添加量、測定ミス、サンゴの消費量増加、換水直後かどうかを確認してください。',
+  calcium: 'Ca添加量、KHとのバランス、試薬の期限を確認してください。',
+  magnesium: 'Mg添加量、塩のロット、測定手順を確認してください。',
+  nitrate: '給餌量、濾過、換水頻度、掃除のタイミングを確認してください。',
+  phosphate: '給餌量、吸着剤、スキマー、換水、冷凍餌のすすぎを確認してください。',
+}
+
+const EVENT_TYPES = [
+  { value: 'dosing', label: '添加' },
+  { value: 'water_change', label: '水換え' },
+  { value: 'feeding_change', label: '給餌変更' },
+  { value: 'lighting_change', label: '照明変更' },
+  { value: 'livestock_added', label: '生体追加' },
+  { value: 'maintenance', label: '掃除・メンテナンス' },
+  { value: 'other', label: 'その他' },
+]
+
 const initialWaterForm = {
   measured_at: todayIso(),
   temperature: '25.0',
@@ -317,6 +404,13 @@ const initialWaterForm = {
   magnesium: '1320',
   nitrate: '2.0',
   phosphate: '0.04',
+  notes: '',
+}
+
+const initialEventForm = {
+  event_at: todayIso(),
+  event_type: 'maintenance',
+  title: '',
   notes: '',
 }
 
@@ -347,6 +441,8 @@ const initialWaterChangeForm = {
 const DEMO_WATER_LOGS_KEY = 'demo_water_logs'
 const DEMO_WATER_LOGS_BACKUP_KEY = 'demo_water_logs_backup'
 const DEMO_CUSTOM_PARAMETERS_KEY = 'demo_custom_parameters'
+const DEMO_EVENT_LOGS_KEY = 'demo_aquarium_event_logs'
+const DEMO_TARGET_SETTINGS_KEY = 'demo_target_settings'
 const BUILTIN_PARAMETER_KEYS = new Set(PARAMETERS.map(parameter => parameter.key))
 
 function todayIso() {
@@ -401,6 +497,82 @@ function buildInitialWaterForm(parameters, keepDate) {
   return form
 }
 
+function defaultTargets() {
+  return TARGET_PRESETS.sps.targets
+}
+
+function getTargetSettings(aquarium) {
+  const preset = aquarium?.target_preset || 'sps'
+  const presetTargets = TARGET_PRESETS[preset]?.targets || defaultTargets()
+  if (preset !== 'custom') return { preset, targets: presetTargets }
+  return { preset, targets: { ...presetTargets, ...(aquarium?.custom_targets || {}) } }
+}
+
+function getRecordValue(record, key) {
+  if (!record) return null
+  const value = record[key] ?? record.custom_values?.[key]
+  return parseNumber(value)
+}
+
+function targetRangeFor(parameter, targets) {
+  const presetRange = targets?.[parameter.key]
+  return {
+    min: presetRange?.min ?? parameter.min ?? null,
+    max: presetRange?.max ?? parameter.max ?? null,
+  }
+}
+
+function buildWaterAnalysis(records, parameters, targets, text) {
+  const latest = records[0] || null
+  const previous = records[1] || null
+  const items = parameters.map(parameter => {
+    const current = getRecordValue(latest, parameter.key)
+    const previousValue = getRecordValue(previous, parameter.key)
+    const delta = current != null && previousValue != null ? current - previousValue : null
+    const rule = ANALYSIS_RULES[parameter.key] || {}
+    const target = targetRangeFor(parameter, targets)
+    let severity = 'normal'
+    const reasons = []
+
+    if (current != null) {
+      if (target.min != null && current < target.min) reasons.push('目標下限未満')
+      if (target.max != null && current > target.max) reasons.push('目標上限超過')
+      if (rule.dangerLow != null && current < rule.dangerLow) reasons.push('危険域の低値')
+      else if (rule.cautionLow != null && current < rule.cautionLow) reasons.push('低め')
+      if (rule.dangerHigh != null && current > rule.dangerHigh) reasons.push('危険域の高値')
+      else if (rule.cautionHigh != null && current > rule.cautionHigh) reasons.push('高め')
+    }
+
+    if (delta != null) {
+      const absDelta = Math.abs(delta)
+      if (rule.dangerDelta != null && absDelta >= rule.dangerDelta) reasons.push('前回から急変')
+      else if (rule.cautionDelta != null && absDelta >= rule.cautionDelta) reasons.push('前回から変動')
+    }
+
+    if (reasons.some(reason => reason.includes('危険') || reason.includes('急変') || reason.includes('上限超過'))) severity = 'danger'
+    else if (reasons.length) severity = 'caution'
+
+    return {
+      key: parameter.key,
+      label: labelFor(parameter, text),
+      unit: parameter.unit,
+      current,
+      previous: previousValue,
+      delta,
+      target,
+      severity,
+      reasons,
+      suggestion: severity === 'normal' ? '現在は大きな異常は見えません。通常の観察を続けてください。' : ACTION_SUGGESTIONS[parameter.key],
+    }
+  })
+
+  const dangerCount = items.filter(item => item.severity === 'danger').length
+  const cautionCount = items.filter(item => item.severity === 'caution').length
+  const topActions = items.filter(item => item.severity !== 'normal').slice(0, 4)
+
+  return { latest, previous, items, dangerCount, cautionCount, topActions }
+}
+
 function readStorageArray(key) {
   if (typeof window === 'undefined') return []
   try {
@@ -417,7 +589,13 @@ function writeStorageArray(key, value) {
 }
 
 function demoAquarium() {
-  return { id: 'demo-aquarium', name: 'Demo Reef Tank', volume_liters: 100 }
+  let settings = null
+  try {
+    settings = typeof window === 'undefined' ? null : JSON.parse(window.localStorage.getItem(DEMO_TARGET_SETTINGS_KEY) || 'null')
+  } catch {
+    settings = null
+  }
+  return { id: 'demo-aquarium', name: 'Demo Reef Tank', volume_liters: 100, target_preset: settings?.preset || 'sps', custom_targets: settings?.targets || {} }
 }
 
 function createLocalId() {
@@ -439,16 +617,20 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   const [inventory, setInventory] = useState([])
   const [doseLogs, setDoseLogs] = useState([])
   const [waterChanges, setWaterChanges] = useState([])
+  const [eventLogs, setEventLogs] = useState([])
   const [waterForm, setWaterForm] = useState(initialWaterForm)
   const [doseForm, setDoseForm] = useState(initialDoseForm)
   const [inventoryForm, setInventoryForm] = useState(initialInventoryForm)
   const [waterChangeForm, setWaterChangeForm] = useState(initialWaterChangeForm)
+  const [eventForm, setEventForm] = useState(initialEventForm)
   const [periodDays, setPeriodDays] = useState(7)
   const [savingWater, setSavingWater] = useState(false)
   const [savingDose, setSavingDose] = useState(false)
   const [savingInventory, setSavingInventory] = useState(false)
   const [savingTank, setSavingTank] = useState(false)
   const [savingWaterChange, setSavingWaterChange] = useState(false)
+  const [savingEvent, setSavingEvent] = useState(false)
+  const [savingTargets, setSavingTargets] = useState(false)
   const [syncingDemo, setSyncingDemo] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -469,6 +651,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       setInventory([])
       setDoseLogs([])
       setWaterChanges([])
+      setEventLogs(readStorageArray(DEMO_EVENT_LOGS_KEY))
     }
   }, [session])
 
@@ -478,6 +661,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
       fetchInventory(selectedAquariumId)
       fetchDoseLogs(selectedAquariumId)
       fetchWaterChanges(selectedAquariumId)
+      fetchEventLogs(selectedAquariumId)
     }
   }, [selectedAquariumId])
 
@@ -538,7 +722,10 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         setSelectedAquariumId(created.id)
         activeAquarium = created
       }
-      if (activeAquarium) await syncDemoWaterLogs(userId, activeAquarium.id)
+      if (activeAquarium) {
+        await syncDemoWaterLogs(userId, activeAquarium.id)
+        await syncDemoEventLogs(userId, activeAquarium.id)
+      }
     } catch (err) {
       setError(text.loadTankError)
       console.error(err)
@@ -603,6 +790,11 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     else setWaterChanges(data ?? [])
   }
 
+  async function fetchEventLogs(aquariumId) {
+    const { data, error } = await supabase.from('aquarium_event_logs').select('*').eq('aquarium_id', aquariumId).order('event_at', { ascending: false }).order('created_at', { ascending: false }).limit(100)
+    if (!error) setEventLogs(data ?? [])
+  }
+
   async function sendMagicLink(event) {
     event.preventDefault()
     const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } })
@@ -638,6 +830,22 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     setSyncingDemo(false)
   }
 
+  async function syncDemoEventLogs(userId, aquariumId) {
+    const demoEvents = readStorageArray(DEMO_EVENT_LOGS_KEY)
+    if (!demoEvents.length) return
+    const payload = demoEvents.map(event => ({
+      aquarium_id: aquariumId,
+      user_id: userId,
+      event_at: event.event_at,
+      event_type: event.event_type,
+      title: event.title,
+      notes: event.notes || null,
+      metadata: event.metadata || {},
+    }))
+    const { error } = await supabase.from('aquarium_event_logs').insert(payload)
+    if (!error) writeStorageArray(DEMO_EVENT_LOGS_KEY, [])
+  }
+
   async function saveTankVolume(volumeLiters) {
     if (isDemoMode) {
       setAquariums([{ ...demoAquarium(), volume_liters: parseNumber(volumeLiters) }])
@@ -649,6 +857,22 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     if (error) setError(text.saveTankError)
     else setAquariums(current => current.map(item => item.id === data.id ? data : item))
     setSavingTank(false)
+  }
+
+  async function saveTargetSettings(preset, targets) {
+    setSavingTargets(true)
+    if (isDemoMode) {
+      if (typeof window !== 'undefined') window.localStorage.setItem(DEMO_TARGET_SETTINGS_KEY, JSON.stringify({ preset, targets }))
+      const nextAquarium = { ...demoAquarium(), target_preset: preset, custom_targets: targets }
+      setAquariums([nextAquarium])
+      setSavingTargets(false)
+      return
+    }
+    const payload = { target_preset: preset, custom_targets: preset === 'custom' ? targets : {} }
+    const { data, error } = await supabase.from('aquariums').update(payload).eq('id', selectedAquariumId).select('*').single()
+    if (error) setError(text.saveTankError)
+    else setAquariums(current => current.map(item => item.id === data.id ? data : item))
+    setSavingTargets(false)
   }
 
   async function saveWaterLog(event) {
@@ -811,9 +1035,44 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     setSavingWaterChange(false)
   }
 
+  async function saveEventLog(event) {
+    event.preventDefault()
+    const title = eventForm.title.trim()
+    if (!title) return
+    setSavingEvent(true)
+    setError(null)
+    const payload = {
+      aquarium_id: selectedAquariumId,
+      user_id: session?.user?.id,
+      event_at: eventForm.event_at,
+      event_type: eventForm.event_type,
+      title,
+      notes: eventForm.notes.trim() || null,
+      metadata: {},
+    }
+    if (isDemoMode) {
+      const data = { ...payload, id: createLocalId(), aquarium_id: 'demo-aquarium', user_id: null, created_at: new Date().toISOString() }
+      const nextEvents = [data, ...eventLogs].slice(0, 100)
+      setEventLogs(nextEvents)
+      writeStorageArray(DEMO_EVENT_LOGS_KEY, nextEvents)
+      setEventForm(current => ({ ...initialEventForm, event_at: current.event_at, event_type: current.event_type }))
+      setSavingEvent(false)
+      return
+    }
+    const { data, error } = await supabase.from('aquarium_event_logs').insert(payload).select('*').single()
+    if (error) setError('イベントログを保存できませんでした。')
+    else {
+      setEventLogs(current => [data, ...current].slice(0, 100))
+      setEventForm(current => ({ ...initialEventForm, event_at: current.event_at, event_type: current.event_type }))
+    }
+    setSavingEvent(false)
+  }
+
   const selectedAquarium = aquariums.find(item => item.id === selectedAquariumId)
   const lowStockItems = inventory.filter(item => Number(item.remaining_amount) <= Number(item.low_stock_threshold))
   const lastWaterChange = waterChanges[0]
+  const targetSettings = getTargetSettings(selectedAquarium)
+  const waterAnalysis = buildWaterAnalysis(records, waterParameters, targetSettings.targets, text)
 
   return (
     <section className="space-y-5 pb-10">
@@ -835,8 +1094,9 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         </div>
       </div>
 
-      <TankDataPanel text={text} locale={locale} aquarium={selectedAquarium} lastWaterChange={lastWaterChange} saving={savingTank} onSaveVolume={saveTankVolume} />
-      <WaterLogForm text={text} parameters={waterParameters} form={waterForm} setForm={setWaterForm} saving={savingWater} onSubmit={saveWaterLog} onAddCustomParameter={addCustomParameter} onHideCustomParameter={hideCustomParameter} />
+      <TankDataPanel text={text} locale={locale} aquarium={selectedAquarium} lastWaterChange={lastWaterChange} saving={savingTank} savingTargets={savingTargets} targetSettings={targetSettings} parameters={waterParameters} onSaveVolume={saveTankVolume} onSaveTargets={saveTargetSettings} />
+      <WaterInsightPanel text={text} locale={locale} analysis={waterAnalysis} />
+      <WaterLogForm text={text} parameters={waterParameters} form={waterForm} setForm={setWaterForm} saving={savingWater} latestRecord={records[0]} onSubmit={saveWaterLog} onAddCustomParameter={addCustomParameter} onHideCustomParameter={hideCustomParameter} />
 
       {!isDemoMode && (
         <>
@@ -849,12 +1109,14 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         </>
       )}
 
+      <EventLogPanel form={eventForm} setForm={setEventForm} events={eventLogs} saving={savingEvent} onSubmit={saveEventLog} />
+
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-lg font-bold text-white">{text.waterChart}</h3>
         <PeriodSwitch text={text} value={periodDays} onChange={setPeriodDays} />
       </div>
       <div className="grid lg:grid-cols-2 gap-4">
-        {waterParameters.map(parameter => <TrendCard key={parameter.key} text={text} locale={locale} records={records} parameter={parameter} periodDays={periodDays} />)}
+        {waterParameters.map(parameter => <TrendCard key={parameter.key} text={text} locale={locale} records={records} parameter={parameter} periodDays={periodDays} target={targetRangeFor(parameter, targetSettings.targets)} />)}
       </div>
 
       {!isDemoMode && <div className="grid lg:grid-cols-2 gap-4">
@@ -915,12 +1177,97 @@ function LowStockAlert({ text, locale, items }) {
   )
 }
 
-function TankDataPanel({ text, locale, aquarium, lastWaterChange, saving, onSaveVolume }) {
+function SeverityPill({ severity }) {
+  const style = severity === 'danger'
+    ? 'border-rose-600 bg-rose-950 text-rose-100'
+    : severity === 'caution'
+      ? 'border-amber-500 bg-amber-950 text-amber-100'
+      : 'border-emerald-600 bg-emerald-950 text-emerald-100'
+  const label = severity === 'danger' ? '危険' : severity === 'caution' ? '注意' : '正常'
+  return <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${style}`}>{label}</span>
+}
+
+function WaterInsightPanel({ text, locale, analysis }) {
+  if (!analysis.latest) {
+    return (
+      <div className="border border-slate-800 bg-slate-900 rounded-lg p-4">
+        <h3 className="text-lg font-bold text-white">今日の判断</h3>
+        <p className="text-sm text-slate-400 mt-2">水質を1件保存すると、前回差分・異常検知・確認すべきことをここに表示します。</p>
+      </div>
+    )
+  }
+
+  const headline = analysis.dangerCount
+    ? `${analysis.dangerCount}項目に危険サインがあります`
+    : analysis.cautionCount
+      ? `${analysis.cautionCount}項目に注意サインがあります`
+      : '大きな異常は見えていません'
+
+  return (
+    <div className="border border-slate-800 bg-slate-900 rounded-lg p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-white">今日の判断</h3>
+          <p className="text-sm text-slate-400 mt-1">{analysis.latest.measured_at} の最新ログを前回値と比較しています。</p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-sm font-bold ${analysis.dangerCount ? 'bg-rose-500 text-white' : analysis.cautionCount ? 'bg-amber-400 text-slate-950' : 'bg-emerald-400 text-slate-950'}`}>
+          {headline}
+        </span>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+        {analysis.items.map(item => (
+          <div key={item.key} className="rounded-md border border-slate-800 bg-slate-950 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-bold text-white">{item.label}</p>
+              <SeverityPill severity={item.severity} />
+            </div>
+            <p className="text-xl font-bold text-white mt-2">{formatValue(item.current, item.unit, locale)}</p>
+            <p className={`text-xs mt-1 ${item.delta == null ? 'text-slate-500' : Math.abs(item.delta) > 0 ? 'text-cyan-200' : 'text-slate-500'}`}>
+              前回差分: {item.delta == null ? '-' : `${item.delta > 0 ? '+' : ''}${formatValue(Number(item.delta.toFixed(3)), item.unit, locale)}`}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1">目標: {formatValue(item.target.min, item.unit, locale)} - {formatValue(item.target.max, item.unit, locale)}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 rounded-md border border-slate-800 bg-slate-950 p-3">
+        <p className="text-sm font-bold text-white">次に確認すること</p>
+        {analysis.topActions.length ? (
+          <div className="mt-2 space-y-2">
+            {analysis.topActions.map(item => (
+              <div key={item.key} className="rounded-md border border-slate-800 bg-slate-900 px-3 py-2">
+                <p className="text-sm font-semibold text-white">{item.label}: {item.reasons.join(' / ')}</p>
+                <p className="text-xs text-slate-400 mt-1">{item.suggestion}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400 mt-2">大きな変動はありません。生体の様子、ポリプの開き、機材の動作を通常通り観察してください。</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TankDataPanel({ text, locale, aquarium, lastWaterChange, saving, savingTargets, targetSettings, parameters, onSaveVolume, onSaveTargets }) {
   const [volume, setVolume] = useState('')
+  const [preset, setPreset] = useState('sps')
+  const [targets, setTargets] = useState(defaultTargets())
 
   useEffect(() => {
     setVolume(aquarium?.volume_liters ?? '')
   }, [aquarium?.id, aquarium?.volume_liters])
+
+  useEffect(() => {
+    setPreset(targetSettings.preset)
+    setTargets(targetSettings.targets)
+  }, [aquarium?.id, targetSettings.preset])
+
+  function changePreset(nextPreset) {
+    setPreset(nextPreset)
+    setTargets(nextPreset === 'custom' ? targetSettings.targets : TARGET_PRESETS[nextPreset].targets)
+  }
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
@@ -943,11 +1290,41 @@ function TankDataPanel({ text, locale, aquarium, lastWaterChange, saving, onSave
           <p className="text-lg font-bold text-white mt-1">{lastWaterChange ? `${lastWaterChange.changed_at} / ${formatValue(lastWaterChange.amount_liters, 'L', locale)}` : text.notRegistered}</p>
         </div>
       </div>
+      <div className="mt-4 rounded-md border border-slate-800 bg-slate-950 p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <label className="flex-1">
+            <span className="text-xs text-slate-400">目標プリセット</span>
+            <select value={preset} onChange={event => changePreset(event.target.value)} className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-3 text-white">
+              {Object.entries(TARGET_PRESETS).map(([key, presetItem]) => <option key={key} value={key}>{presetItem.label}</option>)}
+              <option value="custom">カスタム</option>
+            </select>
+          </label>
+          <button type="button" disabled={savingTargets} onClick={() => onSaveTargets(preset, targets)} className="bg-emerald-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md px-4 py-3">
+            {savingTargets ? text.saving : '目標を保存'}
+          </button>
+        </div>
+        {preset === 'custom' && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+            {parameters.filter(parameter => BUILTIN_PARAMETER_KEYS.has(parameter.key)).map(parameter => {
+              const range = targets[parameter.key] || targetRangeFor(parameter, targets)
+              return (
+                <div key={parameter.key} className="rounded-md border border-slate-800 bg-slate-900 p-2">
+                  <p className="text-xs text-slate-400">{labelFor(parameter, text)}</p>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    <input type="number" inputMode="decimal" value={range.min ?? ''} onChange={event => setTargets(current => ({ ...current, [parameter.key]: { ...(current[parameter.key] || {}), min: parseNumber(event.target.value) } }))} className="min-w-0 bg-slate-950 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
+                    <input type="number" inputMode="decimal" value={range.max ?? ''} onChange={event => setTargets(current => ({ ...current, [parameter.key]: { ...(current[parameter.key] || {}), max: parseNumber(event.target.value) } }))} className="min-w-0 bg-slate-950 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function WaterLogForm({ text, parameters, form, setForm, saving, onSubmit, onAddCustomParameter, onHideCustomParameter }) {
+function WaterLogForm({ text, parameters, form, setForm, saving, latestRecord, onSubmit, onAddCustomParameter, onHideCustomParameter }) {
   const [customForm, setCustomForm] = useState({ key: '', label: '', unit: '', step: '1', defaultValue: '' })
 
   function adjust(parameter, direction) {
@@ -966,11 +1343,28 @@ function WaterLogForm({ text, parameters, form, setForm, saving, onSubmit, onAdd
     setCustomForm({ key: '', label: '', unit: '', step: '1', defaultValue: '' })
   }
 
+  function copyPreviousValues() {
+    if (!latestRecord) return
+    setForm(current => {
+      const next = { ...current }
+      parameters.forEach(parameter => {
+        const value = getRecordValue(latestRecord, parameter.key)
+        if (value != null) next[parameter.key] = String(value)
+      })
+      return next
+    })
+  }
+
   return (
     <form onSubmit={onSubmit} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
         <h3 className="text-lg font-bold text-white">{text.todayWater}</h3>
-        <input type="date" value={form.measured_at} onChange={event => setForm(current => ({ ...current, measured_at: event.target.value }))} className="bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-white text-sm" />
+        <div className="flex gap-2">
+          <button type="button" onClick={copyPreviousValues} disabled={!latestRecord} className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-semibold text-cyan-200 disabled:text-slate-600">
+            前回値をコピー
+          </button>
+          <input type="date" value={form.measured_at} onChange={event => setForm(current => ({ ...current, measured_at: event.target.value }))} className="bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-white text-sm" />
+        </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {parameters.map(parameter => (
@@ -1123,6 +1517,47 @@ function AdditiveDoseForm({ text, locale, additives, inventory, form, setForm, s
   )
 }
 
+function EventLogPanel({ form, setForm, events, saving, onSubmit }) {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-bold text-white">作業・イベントログ</h3>
+          <p className="text-xs text-slate-500 mt-1">将来、水質グラフ上にマーカー表示するための記録です。</p>
+        </div>
+      </div>
+      <form onSubmit={onSubmit} className="mt-3 space-y-3">
+        <div className="grid sm:grid-cols-[150px_160px_1fr] gap-3">
+          <input type="date" value={form.event_at} onChange={event => setForm(current => ({ ...current, event_at: event.target.value }))} className="bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+          <select value={form.event_type} onChange={event => setForm(current => ({ ...current, event_type: event.target.value }))} className="bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white">
+            {EVENT_TYPES.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
+          </select>
+          <input value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder="例: スキマー清掃、照明を1時間短縮" className="bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+        </div>
+        <input value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} placeholder="メモ" className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+        <button type="submit" disabled={saving || !form.title.trim()} className="w-full bg-violet-300 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-3">
+          {saving ? '保存中...' : 'イベントを記録'}
+        </button>
+      </form>
+      <div className="mt-4 divide-y divide-slate-800">
+        {events.slice(0, 8).map(event => {
+          const type = EVENT_TYPES.find(item => item.value === event.event_type)
+          return (
+            <div key={event.id} className="py-3">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-slate-950 border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300">{type?.label || event.event_type}</span>
+                <p className="text-sm font-semibold text-white">{event.event_at} / {event.title}</p>
+              </div>
+              {event.notes && <p className="text-xs text-slate-500 mt-1">{event.notes}</p>}
+            </div>
+          )
+        })}
+        {events.length === 0 && <p className="py-6 text-center text-sm text-slate-500">まだイベントログはありません。</p>}
+      </div>
+    </div>
+  )
+}
+
 function groupByBrand(additives) {
   return additives.reduce((groups, product) => {
     if (!groups[product.brand]) groups[product.brand] = []
@@ -1135,14 +1570,16 @@ function PeriodSwitch({ text, value, onChange }) {
   return <div className="flex gap-2">{[7, 30].map(days => <button key={days} type="button" onClick={() => onChange(days)} className={`text-xs px-3 py-2 rounded-md border ${value === days ? 'border-cyan-500 bg-cyan-950 text-cyan-200' : 'border-slate-700 text-slate-400'}`}>{days === 7 ? text.week : text.month}</button>)}</div>
 }
 
-function TrendCard({ text, locale, records, parameter, periodDays }) {
+function TrendCard({ text, locale, records, parameter, periodDays, target }) {
   const points = useChartPoints(records, parameter.key, periodDays)
   const values = points.map(point => point.value)
   const label = labelFor(parameter, text)
+  const latestValue = values.length ? values[values.length - 1] : null
 
   return (
-    <ChartCard title={label} subtitle={`${parameter.min} - ${parameter.max} ${parameter.unit}`} color={parameter.color} points={points} unit={parameter.unit} minGuide={parameter.min} maxGuide={parameter.max} text={text} locale={locale}>
-      <div className="grid grid-cols-3 gap-2 mt-2">
+    <ChartCard title={label} subtitle={`目標 ${formatValue(target.min, parameter.unit, locale)} - ${formatValue(target.max, parameter.unit, locale)}`} color={parameter.color} points={points} unit={parameter.unit} minGuide={target.min} maxGuide={target.max} text={text} locale={locale}>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+        <Stat label={text.latest} value={latestValue} unit={parameter.unit} locale={locale} />
         <Stat label={text.average} value={average(values)} unit={parameter.unit} locale={locale} />
         <Stat label={text.minimum} value={values.length ? Math.min(...values) : null} unit={parameter.unit} locale={locale} />
         <Stat label={text.maximum} value={values.length ? Math.max(...values) : null} unit={parameter.unit} locale={locale} />

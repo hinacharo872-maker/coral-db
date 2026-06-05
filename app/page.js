@@ -355,7 +355,7 @@ function CoralBrowser({
 
       {!loading && !error && filtered.length === 0 && (
         <div className="text-center py-20 text-cyan-300">
-          <p>{text.noCorals}</p>
+          <p>{totalCount === 0 ? 'サンゴDBは準備中です。先に水質管理ツールを利用できます。' : text.noCorals}</p>
           <button
             type="button"
             onClick={() => { setSearch(''); setCategory('') }}
