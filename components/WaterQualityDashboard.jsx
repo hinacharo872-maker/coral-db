@@ -297,14 +297,14 @@ const TEXT = {
 const NUMBER_LOCALE = { ja: 'ja-JP', en: 'en-US', de: 'de-DE', zh: 'zh-CN' }
 
 const PARAMETERS = [
-  { key: 'temperature', unit: '°C', min: 24, max: 26.5, step: '0.1', color: '#22d3ee' },
-  { key: 'salinity', unit: '', min: 1.024, max: 1.026, step: '0.001', color: '#38bdf8' },
-  { key: 'ph', unit: '', min: 8.0, max: 8.4, step: '0.1', color: '#a78bfa' },
-  { key: 'kh', unit: 'dKH', min: 7.0, max: 9.0, step: '0.1', color: '#f59e0b' },
-  { key: 'calcium', unit: 'ppm', min: 400, max: 450, step: '1', color: '#f472b6' },
-  { key: 'magnesium', unit: 'ppm', min: 1250, max: 1400, step: '1', color: '#818cf8' },
-  { key: 'nitrate', unit: 'ppm', min: 0.2, max: 10, step: '0.1', color: '#34d399' },
-  { key: 'phosphate', unit: 'ppm', min: 0.02, max: 0.08, step: '0.01', color: '#fb7185' },
+  { key: 'temperature', unit: '°C', min: 24, max: 26.5, step: '0.1', defaultValue: 25.0, color: '#22d3ee' },
+  { key: 'salinity', unit: '', min: 1.024, max: 1.026, step: '0.001', defaultValue: 1.025, color: '#38bdf8' },
+  { key: 'ph', unit: '', min: 8.0, max: 8.4, step: '0.1', defaultValue: 8.2, color: '#a78bfa' },
+  { key: 'kh', unit: 'dKH', min: 7.0, max: 9.0, step: '0.1', defaultValue: 8.0, color: '#f59e0b' },
+  { key: 'calcium', unit: 'ppm', min: 400, max: 450, step: '5', defaultValue: 430, color: '#f472b6' },
+  { key: 'magnesium', unit: 'ppm', min: 1250, max: 1400, step: '10', defaultValue: 1320, color: '#818cf8' },
+  { key: 'nitrate', unit: 'ppm', min: 0.2, max: 10, step: '0.1', defaultValue: 2.0, color: '#34d399' },
+  { key: 'phosphate', unit: 'ppm', min: 0.02, max: 0.08, step: '0.01', defaultValue: 0.04, color: '#fb7185' },
 ]
 
 const initialWaterForm = {
@@ -344,6 +344,11 @@ const initialWaterChangeForm = {
   notes: '',
 }
 
+const DEMO_WATER_LOGS_KEY = 'demo_water_logs'
+const DEMO_WATER_LOGS_BACKUP_KEY = 'demo_water_logs_backup'
+const DEMO_CUSTOM_PARAMETERS_KEY = 'demo_custom_parameters'
+const BUILTIN_PARAMETER_KEYS = new Set(PARAMETERS.map(parameter => parameter.key))
+
 function todayIso() {
   const now = new Date()
   const offset = now.getTimezoneOffset() * 60000
@@ -367,7 +372,57 @@ function productLabel(product) {
 }
 
 function labelFor(parameter, text) {
-  return text.parameters[parameter.key] || parameter.key
+  return parameter.label || text.parameters[parameter.key] || parameter.key
+}
+
+function normalizeParameter(parameter, text) {
+  return {
+    id: parameter.id ?? parameter.key,
+    key: parameter.key,
+    label: parameter.label || text.parameters[parameter.key] || parameter.key,
+    unit: parameter.unit || '',
+    step: Number(parameter.step || 1),
+    min: parameter.min_value ?? parameter.min ?? null,
+    max: parameter.max_value ?? parameter.max ?? null,
+    defaultValue: parameter.default_value ?? parameter.defaultValue ?? '',
+    displayOrder: parameter.display_order ?? parameter.displayOrder ?? 100,
+    isBuiltin: parameter.is_builtin ?? BUILTIN_PARAMETER_KEYS.has(parameter.key),
+    isActive: parameter.is_active ?? true,
+    color: parameter.color || '#34d399',
+  }
+}
+
+function buildInitialWaterForm(parameters, keepDate) {
+  const form = { measured_at: keepDate || todayIso(), notes: '' }
+  parameters.forEach(parameter => {
+    const value = parameter.defaultValue !== '' && parameter.defaultValue != null ? parameter.defaultValue : ''
+    form[parameter.key] = value === '' ? '' : String(value)
+  })
+  return form
+}
+
+function readStorageArray(key) {
+  if (typeof window === 'undefined') return []
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeStorageArray(key, value) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(key, JSON.stringify(value))
+}
+
+function demoAquarium() {
+  return { id: 'demo-aquarium', name: 'Demo Reef Tank', volume_liters: 100 }
+}
+
+function createLocalId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return `demo-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 export default function WaterQualityDashboard({ locale = 'ja' }) {
@@ -375,9 +430,11 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   const [session, setSession] = useState(null)
   const [email, setEmail] = useState('')
   const [authMessage, setAuthMessage] = useState('')
+  const [demoMessage, setDemoMessage] = useState('')
   const [aquariums, setAquariums] = useState([])
   const [selectedAquariumId, setSelectedAquariumId] = useState('')
   const [records, setRecords] = useState([])
+  const [waterParameters, setWaterParameters] = useState(() => PARAMETERS.map(parameter => normalizeParameter(parameter, text)))
   const [additives, setAdditives] = useState([])
   const [inventory, setInventory] = useState([])
   const [doseLogs, setDoseLogs] = useState([])
@@ -392,8 +449,10 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
   const [savingInventory, setSavingInventory] = useState(false)
   const [savingTank, setSavingTank] = useState(false)
   const [savingWaterChange, setSavingWaterChange] = useState(false)
+  const [syncingDemo, setSyncingDemo] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const isDemoMode = !session
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -403,26 +462,46 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
 
   useEffect(() => {
     fetchAdditives()
-    if (session) bootstrap(session.user.id)
-    else {
-      setAquariums([])
-      setRecords([])
+    if (session) {
+      bootstrap(session.user.id)
+    } else {
+      bootstrapDemo()
       setInventory([])
       setDoseLogs([])
       setWaterChanges([])
-      setSelectedAquariumId('')
-      setLoading(false)
     }
   }, [session])
 
   useEffect(() => {
-    if (selectedAquariumId) {
+    if (selectedAquariumId && session) {
       fetchWaterLogs(selectedAquariumId)
       fetchInventory(selectedAquariumId)
       fetchDoseLogs(selectedAquariumId)
       fetchWaterChanges(selectedAquariumId)
     }
   }, [selectedAquariumId])
+
+  useEffect(() => {
+    setWaterForm(current => {
+      const next = buildInitialWaterForm(waterParameters, current.measured_at)
+      Object.keys(current).forEach(key => {
+        if (key in next && current[key] !== '') next[key] = current[key]
+      })
+      next.notes = current.notes || ''
+      return next
+    })
+  }, [waterParameters])
+
+  function bootstrapDemo() {
+    setLoading(true)
+    const demoParameters = readStorageArray(DEMO_CUSTOM_PARAMETERS_KEY).map(parameter => normalizeParameter(parameter, text))
+    const activeParameters = [...PARAMETERS.map(parameter => normalizeParameter(parameter, text)), ...demoParameters]
+    setWaterParameters(activeParameters)
+    setAquariums([demoAquarium()])
+    setSelectedAquariumId('demo-aquarium')
+    setRecords(readStorageArray(DEMO_WATER_LOGS_KEY))
+    setLoading(false)
+  }
 
   async function fetchAdditives() {
     const { data, error } = await supabase.from('additive_products').select('*').order('sort_order')
@@ -438,11 +517,16 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     setLoading(true)
     setError(null)
     try {
+      await syncDemoCustomParameters(userId)
+      const parameters = await fetchWaterParameters(userId)
+      setWaterParameters(parameters)
       const { data, error } = await supabase.from('aquariums').select('*').order('created_at')
       if (error) throw error
+      let activeAquarium
       if (data?.length) {
         setAquariums(data)
         setSelectedAquariumId(data[0].id)
+        activeAquarium = data[0]
       } else {
         const { data: created, error: createError } = await supabase
           .from('aquariums')
@@ -452,13 +536,47 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
         if (createError) throw createError
         setAquariums([created])
         setSelectedAquariumId(created.id)
+        activeAquarium = created
       }
+      if (activeAquarium) await syncDemoWaterLogs(userId, activeAquarium.id)
     } catch (err) {
       setError(text.loadTankError)
       console.error(err)
     } finally {
       setLoading(false)
     }
+  }
+
+  async function syncDemoCustomParameters(userId) {
+    const demoParameters = readStorageArray(DEMO_CUSTOM_PARAMETERS_KEY)
+    if (!demoParameters.length) return
+    const payload = demoParameters.map((parameter, index) => ({
+      user_id: userId,
+      key: parameter.key,
+      label: parameter.label,
+      unit: parameter.unit || null,
+      step: parseNumber(parameter.step) || 1,
+      default_value: parseNumber(parameter.defaultValue),
+      display_order: parameter.displayOrder ?? 200 + index,
+      is_builtin: false,
+      is_active: true,
+    }))
+    const { error } = await supabase.from('water_parameters').upsert(payload, { onConflict: 'user_id,key' })
+    if (!error) writeStorageArray(DEMO_CUSTOM_PARAMETERS_KEY, [])
+  }
+
+  async function fetchWaterParameters(userId) {
+    const fallback = PARAMETERS.map(parameter => normalizeParameter(parameter, text))
+    const { data, error } = await supabase
+      .from('water_parameters')
+      .select('*')
+      .or(`user_id.is.null,user_id.eq.${userId}`)
+      .order('display_order')
+    if (error) return fallback
+    const normalized = (data ?? [])
+      .filter(parameter => parameter.is_active)
+      .map(parameter => normalizeParameter(parameter, text))
+    return normalized.length ? normalized : fallback
   }
 
   async function fetchWaterLogs(aquariumId) {
@@ -491,7 +609,40 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     setAuthMessage(error ? error.message : text.loginSent)
   }
 
+  async function syncDemoWaterLogs(userId, aquariumId) {
+    const demoLogs = readStorageArray(DEMO_WATER_LOGS_KEY)
+    if (!demoLogs.length || syncingDemo) return
+    setSyncingDemo(true)
+    const payload = demoLogs.map(record => {
+      const row = {
+        aquarium_id: aquariumId,
+        user_id: userId,
+        measured_at: record.measured_at,
+        notes: record.notes || null,
+        custom_values: record.custom_values || {},
+      }
+      PARAMETERS.forEach(parameter => {
+        row[parameter.key] = parseNumber(record[parameter.key])
+      })
+      return row
+    })
+    const { error } = await supabase.from('water_quality_logs').insert(payload)
+    if (error) {
+      setError(`デモデータの同期に失敗しました: ${error.message}`)
+    } else {
+      writeStorageArray(DEMO_WATER_LOGS_BACKUP_KEY, demoLogs)
+      writeStorageArray(DEMO_WATER_LOGS_KEY, [])
+      setDemoMessage(`デモデータ ${demoLogs.length}件をアカウントへ同期しました。`)
+      await fetchWaterLogs(aquariumId)
+    }
+    setSyncingDemo(false)
+  }
+
   async function saveTankVolume(volumeLiters) {
+    if (isDemoMode) {
+      setAquariums([{ ...demoAquarium(), volume_liters: parseNumber(volumeLiters) }])
+      return
+    }
     setSavingTank(true)
     setError(null)
     const { data, error } = await supabase.from('aquariums').update({ volume_liters: parseNumber(volumeLiters) }).eq('id', selectedAquariumId).select('*').single()
@@ -504,15 +655,85 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     event.preventDefault()
     setSavingWater(true)
     setError(null)
-    const payload = { aquarium_id: selectedAquariumId, user_id: session.user.id, measured_at: waterForm.measured_at, notes: waterForm.notes.trim() || null }
-    PARAMETERS.forEach(parameter => { payload[parameter.key] = parseNumber(waterForm[parameter.key]) })
+    const customValues = {}
+    const payload = { aquarium_id: selectedAquariumId, user_id: session?.user?.id, measured_at: waterForm.measured_at, notes: waterForm.notes.trim() || null, custom_values: customValues }
+    waterParameters.forEach(parameter => {
+      const value = parseNumber(waterForm[parameter.key])
+      if (parameter.isBuiltin && BUILTIN_PARAMETER_KEYS.has(parameter.key)) payload[parameter.key] = value
+      else if (value != null) customValues[parameter.key] = value
+    })
+    if (isDemoMode) {
+      const data = { ...payload, id: createLocalId(), created_at: new Date().toISOString(), aquarium_id: 'demo-aquarium', user_id: null }
+      const nextRecords = [data, ...records].slice(0, 365)
+      setRecords(nextRecords)
+      writeStorageArray(DEMO_WATER_LOGS_KEY, nextRecords)
+      setWaterForm(current => buildInitialWaterForm(waterParameters, current.measured_at))
+      setSavingWater(false)
+      return
+    }
     const { data, error } = await supabase.from('water_quality_logs').insert(payload).select('*').single()
     if (error) setError(text.saveWaterError)
     else {
       setRecords(current => [data, ...current].slice(0, 365))
-      setWaterForm(current => ({ ...initialWaterForm, measured_at: current.measured_at }))
+      setWaterForm(current => buildInitialWaterForm(waterParameters, current.measured_at))
     }
     setSavingWater(false)
+  }
+
+  async function addCustomParameter(parameter) {
+    const key = parameter.key.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
+    if (!key) return
+    const nextParameter = normalizeParameter({
+      ...parameter,
+      key,
+      display_order: 200 + waterParameters.length,
+      is_builtin: false,
+      is_active: true,
+    }, text)
+
+    if (isDemoMode) {
+      const current = readStorageArray(DEMO_CUSTOM_PARAMETERS_KEY)
+      const next = [...current.filter(item => item.key !== key), nextParameter]
+      writeStorageArray(DEMO_CUSTOM_PARAMETERS_KEY, next)
+      setWaterParameters(currentParameters => [...currentParameters.filter(item => item.key !== key), nextParameter])
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('water_parameters')
+      .insert({
+        user_id: session.user.id,
+        key,
+        label: parameter.label,
+        unit: parameter.unit || null,
+        step: parseNumber(parameter.step) || 1,
+        default_value: parseNumber(parameter.defaultValue),
+        display_order: 200 + waterParameters.length,
+        is_builtin: false,
+        is_active: true,
+      })
+      .select('*')
+      .single()
+    if (error) setError(`カスタム項目を追加できませんでした: ${error.message}`)
+    else setWaterParameters(current => [...current, normalizeParameter(data, text)])
+  }
+
+  async function hideCustomParameter(parameterKey) {
+    const parameter = waterParameters.find(item => item.key === parameterKey)
+    if (!parameter || parameter.isBuiltin) return
+    if (isDemoMode) {
+      const next = readStorageArray(DEMO_CUSTOM_PARAMETERS_KEY).filter(item => item.key !== parameterKey)
+      writeStorageArray(DEMO_CUSTOM_PARAMETERS_KEY, next)
+      setWaterParameters(current => current.filter(item => item.key !== parameterKey))
+      return
+    }
+    const { error } = await supabase
+      .from('water_parameters')
+      .update({ is_active: false })
+      .eq('key', parameterKey)
+      .eq('user_id', session.user.id)
+    if (error) setError(`カスタム項目を非表示にできませんでした: ${error.message}`)
+    else setWaterParameters(current => current.filter(item => item.key !== parameterKey))
   }
 
   async function saveInventory(event) {
@@ -590,15 +811,15 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
     setSavingWaterChange(false)
   }
 
-  if (!session) return <LoginPanel text={text} email={email} authMessage={authMessage} setEmail={setEmail} sendMagicLink={sendMagicLink} />
-
   const selectedAquarium = aquariums.find(item => item.id === selectedAquariumId)
   const lowStockItems = inventory.filter(item => Number(item.remaining_amount) <= Number(item.low_stock_threshold))
   const lastWaterChange = waterChanges[0]
 
   return (
     <section className="space-y-5 pb-10">
+      {isDemoMode && <DemoModePanel text={text} email={email} authMessage={authMessage} setEmail={setEmail} sendMagicLink={sendMagicLink} />}
       {error && <div className="border border-rose-800 bg-rose-950/50 rounded-lg p-4 text-rose-100 text-sm">{error}</div>}
+      {demoMessage && <div className="border border-emerald-800 bg-emerald-950/50 rounded-lg p-4 text-emerald-100 text-sm">{demoMessage}</div>}
       {lowStockItems.length > 0 && <LowStockAlert text={text} locale={locale} items={lowStockItems} />}
 
       <div className="flex items-center justify-between gap-3">
@@ -610,33 +831,37 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
           <select value={selectedAquariumId} onChange={event => setSelectedAquariumId(event.target.value)} className="max-w-[140px] bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-white">
             {aquariums.map(aquarium => <option key={aquarium.id} value={aquarium.id}>{aquarium.name}</option>)}
           </select>
-          <button type="button" onClick={() => supabase.auth.signOut()} className="text-xs text-slate-500 hover:text-white">{text.logout}</button>
+          {!isDemoMode && <button type="button" onClick={() => supabase.auth.signOut()} className="text-xs text-slate-500 hover:text-white">{text.logout}</button>}
         </div>
       </div>
 
       <TankDataPanel text={text} locale={locale} aquarium={selectedAquarium} lastWaterChange={lastWaterChange} saving={savingTank} onSaveVolume={saveTankVolume} />
-      <WaterLogForm text={text} form={waterForm} setForm={setWaterForm} saving={savingWater} onSubmit={saveWaterLog} />
+      <WaterLogForm text={text} parameters={waterParameters} form={waterForm} setForm={setWaterForm} saving={savingWater} onSubmit={saveWaterLog} onAddCustomParameter={addCustomParameter} onHideCustomParameter={hideCustomParameter} />
 
-      <div className="grid xl:grid-cols-2 gap-4">
-        <InventoryPanel text={text} locale={locale} additives={additives} inventory={inventory} form={inventoryForm} setForm={setInventoryForm} saving={savingInventory} onSubmit={saveInventory} onArchive={archiveInventory} />
-        <WaterChangePanel text={text} locale={locale} form={waterChangeForm} setForm={setWaterChangeForm} saving={savingWaterChange} waterChanges={waterChanges} onSubmit={saveWaterChange} />
-      </div>
+      {!isDemoMode && (
+        <>
+          <div className="grid xl:grid-cols-2 gap-4">
+            <InventoryPanel text={text} locale={locale} additives={additives} inventory={inventory} form={inventoryForm} setForm={setInventoryForm} saving={savingInventory} onSubmit={saveInventory} onArchive={archiveInventory} />
+            <WaterChangePanel text={text} locale={locale} form={waterChangeForm} setForm={setWaterChangeForm} saving={savingWaterChange} waterChanges={waterChanges} onSubmit={saveWaterChange} />
+          </div>
 
-      <AdditiveDoseForm text={text} locale={locale} additives={additives} inventory={inventory} form={doseForm} setForm={setDoseForm} saving={savingDose} onSubmit={saveDoseLog} />
+          <AdditiveDoseForm text={text} locale={locale} additives={additives} inventory={inventory} form={doseForm} setForm={setDoseForm} saving={savingDose} onSubmit={saveDoseLog} />
+        </>
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-lg font-bold text-white">{text.waterChart}</h3>
         <PeriodSwitch text={text} value={periodDays} onChange={setPeriodDays} />
       </div>
       <div className="grid lg:grid-cols-2 gap-4">
-        {PARAMETERS.map(parameter => <TrendCard key={parameter.key} text={text} locale={locale} records={records} parameter={parameter} periodDays={periodDays} />)}
+        {waterParameters.map(parameter => <TrendCard key={parameter.key} text={text} locale={locale} records={records} parameter={parameter} periodDays={periodDays} />)}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      {!isDemoMode && <div className="grid lg:grid-cols-2 gap-4">
         {additives.filter(product => doseLogs.some(log => log.additive_product_id === product.id)).map(product => (
           <AdditiveTrendCard key={product.id} text={text} locale={locale} product={product} logs={doseLogs} periodDays={periodDays} />
         ))}
-      </div>
+      </div>}
 
       <RecentLists text={text} locale={locale} records={records} doseLogs={doseLogs} loading={loading} />
     </section>
@@ -657,6 +882,24 @@ function LoginPanel({ text, email, authMessage, setEmail, sendMagicLink }) {
         </form>
       </div>
     </section>
+  )
+}
+
+function DemoModePanel({ text, email, authMessage, setEmail, sendMagicLink }) {
+  return (
+    <div className="border border-cyan-800 bg-cyan-950/40 rounded-lg p-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-cyan-200 font-bold">デモモード</p>
+          <p className="text-sm text-cyan-100/90 mt-1">※現在デモモードです。データはブラウザに一時保存されます。</p>
+        </div>
+        <form onSubmit={sendMagicLink} className="flex flex-col sm:flex-row gap-2 min-w-full sm:min-w-[420px]">
+          <input type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder={text.email} className="min-w-0 flex-1 bg-slate-950 border border-cyan-800 rounded-md px-3 py-3 text-white" />
+          <button type="submit" className="bg-cyan-400 text-slate-950 font-bold rounded-md px-4 py-3">アカウントを作成してデータを保存・同期する</button>
+        </form>
+      </div>
+      {authMessage && <p className="text-xs text-cyan-200 mt-3">{authMessage}</p>}
+    </div>
   )
 }
 
@@ -704,7 +947,25 @@ function TankDataPanel({ text, locale, aquarium, lastWaterChange, saving, onSave
   )
 }
 
-function WaterLogForm({ text, form, setForm, saving, onSubmit }) {
+function WaterLogForm({ text, parameters, form, setForm, saving, onSubmit, onAddCustomParameter, onHideCustomParameter }) {
+  const [customForm, setCustomForm] = useState({ key: '', label: '', unit: '', step: '1', defaultValue: '' })
+
+  function adjust(parameter, direction) {
+    setForm(current => {
+      const currentValue = parseNumber(current[parameter.key]) ?? parseNumber(parameter.defaultValue) ?? 0
+      const step = Number(parameter.step || 1)
+      const nextValue = currentValue + direction * step
+      const decimals = String(step).includes('.') ? String(step).split('.')[1].length : 0
+      return { ...current, [parameter.key]: Number(nextValue.toFixed(Math.min(decimals, 4))).toString() }
+    })
+  }
+
+  async function submitCustomParameter(event) {
+    event.preventDefault()
+    await onAddCustomParameter(customForm)
+    setCustomForm({ key: '', label: '', unit: '', step: '1', defaultValue: '' })
+  }
+
   return (
     <form onSubmit={onSubmit} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
@@ -712,15 +973,33 @@ function WaterLogForm({ text, form, setForm, saving, onSubmit }) {
         <input type="date" value={form.measured_at} onChange={event => setForm(current => ({ ...current, measured_at: event.target.value }))} className="bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-white text-sm" />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {PARAMETERS.map(parameter => (
-          <label key={parameter.key}>
-            <span className="text-xs text-slate-400">{labelFor(parameter, text)} {parameter.unit}</span>
-            <input type="number" inputMode="decimal" step={parameter.step} value={form[parameter.key]} onChange={event => setForm(current => ({ ...current, [parameter.key]: event.target.value }))} className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
-          </label>
+        {parameters.map(parameter => (
+          <div key={parameter.key}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-400">{labelFor(parameter, text)} {parameter.unit}</span>
+              {!parameter.isBuiltin && <button type="button" onClick={() => onHideCustomParameter(parameter.key)} className="text-[11px] text-slate-500 hover:text-rose-300">非表示</button>}
+            </div>
+            <div className="grid grid-cols-[48px_1fr_48px] gap-2 mt-1">
+              <button type="button" onClick={() => adjust(parameter, -1)} className="min-h-[48px] rounded-md border border-slate-700 bg-slate-950 text-xl font-bold text-cyan-200 active:bg-cyan-950">-</button>
+              <input type="number" inputMode="decimal" step={parameter.step} value={form[parameter.key] ?? ''} onChange={event => setForm(current => ({ ...current, [parameter.key]: event.target.value }))} className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-center text-white" />
+              <button type="button" onClick={() => adjust(parameter, 1)} className="min-h-[48px] rounded-md border border-slate-700 bg-slate-950 text-xl font-bold text-cyan-200 active:bg-cyan-950">+</button>
+            </div>
+          </div>
         ))}
       </div>
       <textarea rows={2} value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} placeholder={text.waterNotes} className="mt-3 w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white resize-none" />
       <button type="submit" disabled={saving} className="w-full bg-cyan-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md py-3 mt-3">{saving ? text.saving : text.saveWater}</button>
+
+      <div className="mt-5 pt-4 border-t border-slate-800">
+        <p className="text-sm font-bold text-white">カスタム項目</p>
+        <div className="grid md:grid-cols-[1fr_1fr_90px_90px_110px] gap-2 mt-3">
+          <input value={customForm.label} onChange={event => setCustomForm(current => ({ ...current, label: event.target.value }))} placeholder="表示名 例: カリウム" className="bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+          <input value={customForm.key} onChange={event => setCustomForm(current => ({ ...current, key: event.target.value }))} placeholder="key 例: potassium" className="bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+          <input value={customForm.unit} onChange={event => setCustomForm(current => ({ ...current, unit: event.target.value }))} placeholder="単位" className="bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+          <input type="number" inputMode="decimal" value={customForm.step} onChange={event => setCustomForm(current => ({ ...current, step: event.target.value }))} placeholder="step" className="bg-slate-950 border border-slate-700 rounded-md px-3 py-3 text-white" />
+          <button type="button" onClick={submitCustomParameter} disabled={!customForm.label || !customForm.key} className="bg-emerald-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-md px-3 py-3">追加</button>
+        </div>
+      </div>
     </form>
   )
 }
@@ -892,7 +1171,13 @@ function useChartPoints(records, key, periodDays) {
     const start = new Date()
     start.setHours(0, 0, 0, 0)
     start.setDate(start.getDate() - periodDays + 1)
-    return records.filter(record => new Date(`${record.measured_at}T00:00:00`) >= start && record[key] != null).map(record => ({ date: record.measured_at, value: Number(record[key]) })).reverse()
+    return records
+      .filter(record => {
+        const value = record[key] ?? record.custom_values?.[key]
+        return new Date(`${record.measured_at}T00:00:00`) >= start && value != null
+      })
+      .map(record => ({ date: record.measured_at, value: Number(record[key] ?? record.custom_values?.[key]) }))
+      .reverse()
   }, [records, key, periodDays])
 }
 
