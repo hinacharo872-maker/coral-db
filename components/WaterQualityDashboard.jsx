@@ -2077,8 +2077,8 @@ function EventLogPanel({ form, setForm, events, saving, editingEventId, onSubmit
                   {event.notes && <p className="text-xs text-slate-500 mt-1">{event.notes}</p>}
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <button type="button" onClick={() => onEdit(event)} className="rounded-md border border-slate-700 px-2 py-1 text-xs text-cyan-200">編集</button>
-                  <button type="button" onClick={() => onDelete(event)} className="rounded-md border border-rose-900 px-2 py-1 text-xs text-rose-200">削除</button>
+                  <button type="button" onClick={() => onEdit(event)} className="min-h-[40px] rounded-md border border-slate-700 px-3 py-2 text-xs text-cyan-200">編集</button>
+                  <button type="button" onClick={() => onDelete(event)} className="min-h-[40px] rounded-md border border-rose-900 px-3 py-2 text-xs text-rose-200">削除</button>
                 </div>
               </div>
             </div>
@@ -2105,7 +2105,7 @@ function PeriodSwitch({ value, onChange }) {
     { value: 90, label: '90日' },
     { value: 'all', label: '全期間' },
   ]
-  return <div className="flex flex-wrap gap-2">{options.map(option => <button key={option.value} type="button" onClick={() => onChange(option.value)} className={`text-xs px-3 py-2 rounded-md border ${value === option.value ? 'border-cyan-500 bg-cyan-950 text-cyan-200' : 'border-slate-700 text-slate-400'}`}>{option.label}</button>)}</div>
+  return <div className="flex flex-wrap gap-2">{options.map(option => <button key={option.value} type="button" onClick={() => onChange(option.value)} className={`min-h-[44px] text-xs px-3 py-2 rounded-md border ${value === option.value ? 'border-cyan-500 bg-cyan-950 text-cyan-200' : 'border-slate-700 text-slate-400'}`}>{option.label}</button>)}</div>
 }
 
 function TrendCard({ text, locale, records, eventLogs, parameter, periodDays, target }) {
@@ -2266,8 +2266,8 @@ function RecentLists({ text, locale, records, doseLogs, loading, error, onEditWa
             {record.notes && <p className="text-xs text-slate-500 mt-1">{record.notes}</p>}
           </div>
           <div className="flex shrink-0 gap-2">
-            <button type="button" onClick={() => onEditWater(record)} className="rounded-md border border-slate-700 px-2 py-1 text-xs text-cyan-200">編集</button>
-            <button type="button" onClick={() => onDeleteWater(record)} className="rounded-md border border-rose-900 px-2 py-1 text-xs text-rose-200">削除</button>
+            <button type="button" onClick={() => onEditWater(record)} className="min-h-[40px] rounded-md border border-slate-700 px-3 py-2 text-xs text-cyan-200">編集</button>
+            <button type="button" onClick={() => onDeleteWater(record)} className="min-h-[40px] rounded-md border border-rose-900 px-3 py-2 text-xs text-rose-200">削除</button>
           </div>
         </div>
       )} />
