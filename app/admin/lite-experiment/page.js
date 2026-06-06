@@ -1,0 +1,96 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Header from '@/components/Header'
+import { supabase } from '@/lib/supabase'
+
+const RATING_LABELS = {
+  sufficient: '十分',
+  mostly_sufficient: 'ほぼ十分',
+  insufficient: '不足',
+}
+
+export default function LiteExperimentAdminPage() {
+  const [loading, setLoading] = useState(true)
+  const [metrics, setMetrics] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function loadMetrics() {
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (!sessionData.session) {
+        setError('管理者としてログインしてください。')
+        setLoading(false)
+        return
+      }
+      const { data, error } = await supabase.rpc('get_lite_experiment_metrics')
+      if (error) setError('管理者権限がないか、集計データを読み込めませんでした。')
+      else setMetrics(data)
+      setLoading(false)
+    }
+    loadMetrics()
+  }, [])
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <Header />
+      <main className="mx-auto max-w-5xl px-4 py-7">
+        <p className="text-sm font-bold text-cyan-300">LITE EXPERIMENT</p>
+        <h1 className="mt-1 text-3xl font-bold text-white">実証実験レポート</h1>
+        <p className="mt-2 text-sm text-slate-400">ショップ共有が実際に使われ、判断材料として十分だったかを確認します。</p>
+
+        {loading && <p className="mt-8 text-slate-300">集計中...</p>}
+        {error && <p className="mt-8 border border-rose-700 bg-rose-950 p-4 text-rose-100">{error}</p>}
+
+        {metrics && (
+          <>
+            <section className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Metric label="共有回数" value={metrics.share_count} />
+              <Metric label="現在有効" value={metrics.active_share_count} />
+              <Metric label="閲覧回数" value={metrics.view_count} />
+              <Metric label="ショップ評価" value={metrics.feedback_count} />
+            </section>
+
+            <section className="mt-7 grid gap-6 lg:grid-cols-2">
+              <div className="border border-slate-700 bg-slate-900 p-5">
+                <h2 className="text-lg font-bold text-white">ショップ評価</h2>
+                <div className="mt-4 space-y-3">
+                  {Object.entries(RATING_LABELS).map(([key, label]) => (
+                    <div key={key} className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <span className="text-slate-300">{label}</span>
+                      <strong className="text-2xl text-white">{metrics.ratings?.[key] || 0}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border border-slate-700 bg-slate-900 p-5">
+                <h2 className="text-lg font-bold text-white">よく不足する情報</h2>
+                {metrics.common_missing_info?.length ? (
+                  <ol className="mt-4 space-y-3">
+                    {metrics.common_missing_info.map((item, index) => (
+                      <li key={`${item.text}-${index}`} className="grid grid-cols-[32px_1fr_auto] gap-2 border-b border-slate-800 pb-3">
+                        <span className="font-bold text-cyan-300">{index + 1}</span>
+                        <span className="text-sm text-slate-200">{item.text}</span>
+                        <span className="font-bold text-white">{item.count}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <p className="mt-4 text-sm text-slate-400">不足情報の回答はまだありません。</p>}
+              </div>
+            </section>
+          </>
+        )}
+      </main>
+    </div>
+  )
+}
+
+function Metric({ label, value }) {
+  return (
+    <article className="border border-slate-700 bg-slate-900 p-4">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-white">{Number(value || 0).toLocaleString('ja-JP')}</p>
+    </article>
+  )
+}

@@ -1,0 +1,282 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import Link from 'next/link'
+import { QRCodeSVG } from 'qrcode.react'
+import Header from '@/components/Header'
+import { LITE_PARAMETER_LABELS, LITE_TARGETS, judgeAll } from '@/lib/liteTargets'
+
+const SAMPLE_LATEST = {
+  measured_at: '2026-06-06T10:30:00+09:00',
+  temperature_c: 25.2,
+  salinity_sg: 1.025,
+  kh_dkh: 7.8,
+  no3_ppm: 18,
+  po4_ppm: 0.14,
+}
+
+const PARAMETERS = [
+  { key: 'kh_dkh', unit: 'dKH' },
+  { key: 'temperature_c', unit: '℃' },
+  { key: 'salinity_sg', unit: 'SG' },
+  { key: 'no3_ppm', unit: 'ppm' },
+  { key: 'po4_ppm', unit: 'ppm' },
+]
+
+const SEVERITY_STYLE = {
+  green: 'border-emerald-500 bg-emerald-950 text-emerald-50',
+  yellow: 'border-amber-400 bg-amber-950 text-amber-50',
+  red: 'border-rose-500 bg-rose-950 text-rose-50',
+  unknown: 'border-slate-600 bg-slate-900 text-slate-300',
+}
+
+function makeMeasurements() {
+  const values = [
+    [8.1, 25.0, 1.025, 7, 0.06],
+    [8.0, 25.2, 1.025, 8, 0.07],
+    [7.9, 25.1, 1.025, 9, 0.08],
+    [7.8, 25.3, 1.024, 11, 0.08],
+    [7.7, 25.4, 1.025, 12, 0.09],
+    [7.6, 25.2, 1.025, 14, 0.11],
+    [7.8, 25.2, 1.025, 16, 0.13],
+    [7.8, 25.2, 1.025, 18, 0.14],
+  ]
+  return values.map((row, index) => ({
+    measured_at: new Date(Date.UTC(2026, 4, 9 + index * 4)).toISOString(),
+    kh_dkh: row[0],
+    temperature_c: row[1],
+    salinity_sg: row[2],
+    no3_ppm: row[3],
+    po4_ppm: row[4],
+  }))
+}
+
+function formatValue(value, key) {
+  if (key === 'salinity_sg') return value.toFixed(4)
+  if (key === 'po4_ppm') return value.toFixed(3)
+  return value.toFixed(key === 'temperature_c' || key === 'kh_dkh' ? 1 : 0)
+}
+
+export default function LitePreviewPage() {
+  const [mode, setMode] = useState('shop')
+  const [rating, setRating] = useState('')
+  const [stopped, setStopped] = useState(false)
+  const measurements = useMemo(makeMeasurements, [])
+  const judged = useMemo(
+    () => new Map(judgeAll(SAMPLE_LATEST).map(item => [item.parameterKey, item.severity])),
+    [],
+  )
+  const previewUrl = 'https://coral-db.vercel.app/lite-preview'
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <Header />
+
+      <div className="border-b border-cyan-900 bg-cyan-950/60">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-cyan-200">レビュー用サンプル</p>
+            <p className="mt-1 text-xs text-slate-300">表示データ・写真・操作結果はすべて架空です。</p>
+          </div>
+          <div className="grid grid-cols-2 border border-cyan-700">
+            <ModeButton active={mode === 'owner'} onClick={() => setMode('owner')}>ユーザー側</ModeButton>
+            <ModeButton active={mode === 'shop'} onClick={() => setMode('shop')}>ショップ側</ModeButton>
+          </div>
+        </div>
+      </div>
+
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        {mode === 'owner' ? (
+          <OwnerPreview stopped={stopped} setStopped={setStopped} previewUrl={previewUrl} />
+        ) : (
+          <ShopPreview measurements={measurements} judged={judged} rating={rating} setRating={setRating} />
+        )}
+
+        <section className="mt-8 border-t border-slate-800 pt-5 text-sm text-slate-400">
+          <p>確認後の実運用では、共有リンクを発行した本人だけが停止でき、ショップはログインせずカルテを閲覧できます。</p>
+          <Link href="/share/create" className="mt-3 inline-block font-bold text-cyan-300 underline underline-offset-4">
+            実際の共有管理画面へ
+          </Link>
+        </section>
+      </main>
+    </div>
+  )
+}
+
+function ModeButton({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-11 px-4 py-2 text-sm font-bold ${active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-950 text-cyan-100'}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function OwnerPreview({ stopped, setStopped, previewUrl }) {
+  return (
+    <section>
+      <p className="text-sm font-bold text-cyan-300">USER SHARE VIEW</p>
+      <h1 className="mt-1 text-3xl font-bold text-white">ショップ共有</h1>
+      <p className="mt-2 text-sm text-slate-300">URLまたはQRコードを店員へ見せます。</p>
+
+      <article className="mt-6 max-w-2xl border border-slate-700 bg-slate-900 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-white">リビング SPS Reef</h2>
+            <p className="mt-1 text-xs text-slate-400">期限: 2026年6月14日 23:59</p>
+          </div>
+          <span className={`px-3 py-1 text-xs font-bold ${stopped ? 'bg-slate-700 text-slate-200' : 'bg-emerald-400 text-slate-950'}`}>
+            {stopped ? '停止済み' : '有効'}
+          </span>
+        </div>
+
+        {!stopped ? (
+          <div className="mt-4 grid gap-4 sm:grid-cols-[164px_1fr]">
+            <div className="w-fit bg-white p-2">
+              <QRCodeSVG value={previewUrl} size={148} level="M" marginSize={1} title="レビュー用QRコード" />
+            </div>
+            <div className="min-w-0">
+              <p className="break-all border border-slate-700 bg-slate-950 p-3 text-xs text-cyan-200">{previewUrl}</p>
+              <button type="button" className="mt-3 min-h-12 w-full bg-cyan-400 px-4 py-3 font-bold text-slate-950">URLを共有</button>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button type="button" className="min-h-11 border border-cyan-600 px-3 py-2 text-sm font-bold text-cyan-100">URLをコピー</button>
+                <button type="button" onClick={() => setStopped(true)} className="min-h-11 border border-rose-700 px-3 py-2 text-sm font-bold text-rose-200">共有を停止</button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
+            このリンクではカルテを表示できません。
+            <button type="button" onClick={() => setStopped(false)} className="ml-2 font-bold text-cyan-300 underline">レビュー状態を戻す</button>
+          </div>
+        )}
+      </article>
+    </section>
+  )
+}
+
+function ShopPreview({ measurements, judged, rating, setRating }) {
+  return (
+    <>
+      <section className="grid gap-5 border-b border-slate-700 pb-6 md:grid-cols-[1fr_360px]">
+        <div>
+          <p className="text-sm font-bold text-cyan-300">SHOP RECORD</p>
+          <h1 className="mt-1 text-3xl font-bold text-white sm:text-4xl">リビング SPS Reef</h1>
+          <p className="mt-3 text-2xl font-bold text-white">180 L</p>
+          <p className="mt-2 text-sm text-slate-400">最終測定: 2026年6月6日 10:30</p>
+        </div>
+        <div className="aspect-[4/3] overflow-hidden border border-slate-700 bg-slate-900">
+          <img src="/lite-review-tank.webp" alt="レビュー用の架空のリーフ水槽" className="h-full w-full object-cover" />
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-lg font-bold text-white">現在値</h2>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {PARAMETERS.map(parameter => (
+            <article key={parameter.key} className={`min-h-28 border-2 p-3 ${SEVERITY_STYLE[judged.get(parameter.key)]}`}>
+              <p className="text-sm font-bold">{LITE_PARAMETER_LABELS[parameter.key]}</p>
+              <p className="mt-3 text-2xl font-bold">{formatValue(SAMPLE_LATEST[parameter.key], parameter.key)}</p>
+              <p className="mt-1 text-xs opacity-80">{parameter.unit}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-lg font-bold text-white">直近30日推移</h2>
+        <div className="mt-3 grid gap-4 lg:grid-cols-2">
+          {PARAMETERS.map(parameter => (
+            <PreviewChart key={parameter.key} parameter={parameter} measurements={measurements} />
+          ))}
+        </div>
+      </section>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <section>
+          <h2 className="text-lg font-bold text-white">使用中添加剤</h2>
+          <div className="mt-3 divide-y divide-slate-800 border border-slate-700">
+            <Additive name="Red Sea Reef Foundation B" detail="毎日 6 ml" />
+            <Additive name="Fauna Marin Ultra Min S" detail="週3回 2 ml" />
+          </div>
+        </section>
+        <section>
+          <h2 className="text-lg font-bold text-white">アプリの確認ポイント</h2>
+          <div className="mt-3 space-y-3 border border-slate-700 bg-slate-900 p-4">
+            <p className="border-l-4 border-amber-400 pl-3 text-sm">PO4を確認</p>
+            <p className="border-l-4 border-amber-400 pl-3 text-sm">NO3が上昇傾向</p>
+            <p className="text-xs text-slate-500">診断ではなく、店員が確認する入口だけを表示します。</p>
+          </div>
+        </section>
+      </div>
+
+      <section className="mt-10 border-t border-slate-700 pt-7">
+        <h2 className="text-xl font-bold text-white">この情報で判断できましたか？</h2>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {[['sufficient', '十分'], ['mostly', 'ほぼ十分'], ['insufficient', '不足']].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setRating(value)}
+              className={`min-h-12 border px-2 py-3 text-sm font-bold ${rating === value ? 'border-cyan-300 bg-cyan-400 text-slate-950' : 'border-slate-600 bg-slate-900 text-white'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {rating === 'insufficient' && (
+          <textarea rows={3} placeholder="欲しかった情報を教えてください" className="mt-3 w-full border border-slate-600 bg-slate-900 p-3 text-white" />
+        )}
+        {rating && <p className="mt-3 text-sm text-cyan-200">レビュー用のため、回答は保存されません。</p>}
+      </section>
+    </>
+  )
+}
+
+function Additive({ name, detail }) {
+  return (
+    <div className="p-4">
+      <p className="font-bold text-white">{name}</p>
+      <p className="mt-1 text-sm text-slate-300">{detail}</p>
+    </div>
+  )
+}
+
+function PreviewChart({ parameter, measurements }) {
+  const target = LITE_TARGETS[parameter.key]
+  const points = measurements.map(item => Number(item[parameter.key]))
+  const width = 520
+  const height = 180
+  const pad = { top: 10, right: 15, bottom: 22, left: 42 }
+  const range = target.yellow[1] - target.yellow[0] || 1
+  const min = target.yellow[0] - range * 0.25
+  const max = target.yellow[1] + range * 0.25
+  const x = index => pad.left + (index / Math.max(points.length - 1, 1)) * (width - pad.left - pad.right)
+  const y = value => pad.top + ((max - value) / (max - min)) * (height - pad.top - pad.bottom)
+  const path = points.map((value, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(value)}`).join(' ')
+
+  return (
+    <article className="border border-slate-700 bg-slate-900 p-3">
+      <div className="flex items-baseline justify-between">
+        <h3 className="font-bold text-white">{LITE_PARAMETER_LABELS[parameter.key]}</h3>
+        <span className="text-xs text-slate-400">{parameter.unit}</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="mt-3 h-auto w-full" role="img" aria-label={`${LITE_PARAMETER_LABELS[parameter.key]}のサンプル推移`}>
+        <rect x={pad.left} y={pad.top} width={width - pad.left - pad.right} height={Math.max(0, y(target.yellow[1]) - pad.top)} fill="#4c0519" />
+        <rect x={pad.left} y={y(target.yellow[1])} width={width - pad.left - pad.right} height={y(target.green[1]) - y(target.yellow[1])} fill="#451a03" />
+        <rect x={pad.left} y={y(target.green[1])} width={width - pad.left - pad.right} height={y(target.green[0]) - y(target.green[1])} fill="#052e16" />
+        <rect x={pad.left} y={y(target.green[0])} width={width - pad.left - pad.right} height={y(target.yellow[0]) - y(target.green[0])} fill="#451a03" />
+        <rect x={pad.left} y={y(target.yellow[0])} width={width - pad.left - pad.right} height={height - pad.bottom - y(target.yellow[0])} fill="#4c0519" />
+        <path d={path} fill="none" stroke="#e2e8f0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((value, index) => <circle key={`${parameter.key}-${index}`} cx={x(index)} cy={y(value)} r="4" fill="#22d3ee" />)}
+        <text x="3" y={y(target.green[1]) + 4} fill="#94a3b8" fontSize="11">{target.green[1]}</text>
+        <text x="3" y={y(target.green[0]) + 4} fill="#94a3b8" fontSize="11">{target.green[0]}</text>
+        <text x={pad.left} y={height - 5} fill="#94a3b8" fontSize="10">5/9</text>
+        <text x={width - pad.right} y={height - 5} textAnchor="end" fill="#94a3b8" fontSize="10">6/6</text>
+      </svg>
+    </article>
+  )
+}
