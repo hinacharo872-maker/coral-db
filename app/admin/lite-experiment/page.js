@@ -10,6 +10,20 @@ const RATING_LABELS = {
   insufficient: '不足',
 }
 
+const MISSING_LABELS = {
+  kh_dkh: 'KH',
+  temperature_c: '水温',
+  salinity_sg: '塩分',
+  no3_ppm: 'NO3',
+  po4_ppm: 'PO4',
+  tank_volume: '水量',
+  water_change_frequency: '水換え頻度',
+  water_change_volume: '換水量',
+  additives: '添加剤',
+  photo: '写真',
+  other: 'その他',
+}
+
 export default function LiteExperimentAdminPage() {
   const [loading, setLoading] = useState(true)
   const [metrics, setMetrics] = useState(null)
@@ -65,19 +79,34 @@ export default function LiteExperimentAdminPage() {
               </div>
 
               <div className="border border-slate-700 bg-slate-900 p-5">
-                <h2 className="text-lg font-bold text-white">よく不足する情報</h2>
-                {metrics.common_missing_info?.length ? (
+                <h2 className="text-lg font-bold text-white">不足項目ランキング</h2>
+                {metrics.missing_key_ranking?.length ? (
                   <ol className="mt-4 space-y-3">
-                    {metrics.common_missing_info.map((item, index) => (
-                      <li key={`${item.text}-${index}`} className="grid grid-cols-[32px_1fr_auto] gap-2 border-b border-slate-800 pb-3">
+                    {metrics.missing_key_ranking.map((item, index) => (
+                      <li key={`${item.key}-${index}`} className="grid grid-cols-[32px_1fr_auto] gap-2 border-b border-slate-800 pb-3">
                         <span className="font-bold text-cyan-300">{index + 1}</span>
-                        <span className="text-sm text-slate-200">{item.text}</span>
+                        <span className="text-sm text-slate-200">{MISSING_LABELS[item.key] || item.key}</span>
                         <span className="font-bold text-white">{item.count}</span>
                       </li>
                     ))}
                   </ol>
-                ) : <p className="mt-4 text-sm text-slate-400">不足情報の回答はまだありません。</p>}
+                ) : <p className="mt-4 text-sm text-slate-400">不足項目の回答はまだありません。</p>}
               </div>
+            </section>
+
+            <section className="mt-6 border border-slate-700 bg-slate-900 p-5">
+              <h2 className="text-lg font-bold text-white">その他の自由回答</h2>
+              {metrics.common_missing_info?.length ? (
+                <ol className="mt-4 space-y-3">
+                  {metrics.common_missing_info.map((item, index) => (
+                    <li key={`${item.text}-${index}`} className="grid grid-cols-[32px_1fr_auto] gap-2 border-b border-slate-800 pb-3">
+                      <span className="font-bold text-cyan-300">{index + 1}</span>
+                      <span className="text-sm text-slate-200">{item.text}</span>
+                      <span className="font-bold text-white">{item.count}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p className="mt-4 text-sm text-slate-400">自由回答はまだありません。</p>}
             </section>
           </>
         )}

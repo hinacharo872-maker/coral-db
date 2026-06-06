@@ -15,6 +15,16 @@ const SAMPLE_LATEST = {
   po4_ppm: 0.14,
 }
 
+const SAMPLE_MEASURED_AT = {
+  kh_dkh: '2026-06-04T10:30:00+09:00',
+  temperature_c: '2026-06-06T10:30:00+09:00',
+  salinity_sg: '2026-06-05T10:30:00+09:00',
+  no3_ppm: '2026-05-26T10:30:00+09:00',
+  po4_ppm: '2026-05-22T10:30:00+09:00',
+}
+
+const REVIEW_NOW = new Date('2026-06-07T12:00:00+09:00')
+
 const PARAMETERS = [
   { key: 'kh_dkh', unit: 'dKH' },
   { key: 'temperature_c', unit: '℃' },
@@ -29,6 +39,22 @@ const SEVERITY_STYLE = {
   red: 'border-rose-500 bg-rose-950 text-rose-50',
   unknown: 'border-slate-600 bg-slate-900 text-slate-300',
 }
+
+const SEVERITY_LABEL = { green: '緑', yellow: '黄', red: '赤', unknown: '未測定' }
+
+const MISSING_OPTIONS = [
+  ['kh_dkh', 'KH'],
+  ['temperature_c', '水温'],
+  ['salinity_sg', '塩分'],
+  ['no3_ppm', 'NO3'],
+  ['po4_ppm', 'PO4'],
+  ['tank_volume', '水量'],
+  ['water_change_frequency', '水換え頻度'],
+  ['water_change_volume', '換水量'],
+  ['additives', '添加剤'],
+  ['photo', '写真'],
+  ['other', 'その他'],
+]
 
 function makeMeasurements() {
   const values = [
@@ -57,9 +83,17 @@ function formatValue(value, key) {
   return value.toFixed(key === 'temperature_c' || key === 'kh_dkh' ? 1 : 0)
 }
 
+function previewFreshness(dateText) {
+  const days = Math.max(0, Math.floor((REVIEW_NOW - new Date(dateText)) / 86400000))
+  if (days >= 14) return { label: `${days}日前`, tone: 'border-rose-500 bg-rose-950 text-rose-200' }
+  if (days >= 7) return { label: `${days}日前`, tone: 'border-amber-400 bg-amber-950 text-amber-200' }
+  return { label: days === 0 ? '今日' : `${days}日前`, tone: 'border-emerald-500 bg-emerald-950 text-emerald-200' }
+}
+
 export default function LitePreviewPage() {
   const [mode, setMode] = useState('shop')
   const [rating, setRating] = useState('')
+  const [missingKeys, setMissingKeys] = useState([])
   const [stopped, setStopped] = useState(false)
   const measurements = useMemo(makeMeasurements, [])
   const judged = useMemo(
@@ -78,9 +112,10 @@ export default function LitePreviewPage() {
             <p className="text-sm font-bold text-cyan-200">レビュー用サンプル</p>
             <p className="mt-1 text-xs text-slate-300">表示データ・写真・操作結果はすべて架空です。</p>
           </div>
-          <div className="grid grid-cols-2 border border-cyan-700">
+          <div className="grid grid-cols-3 border border-cyan-700">
             <ModeButton active={mode === 'owner'} onClick={() => setMode('owner')}>ユーザー側</ModeButton>
             <ModeButton active={mode === 'shop'} onClick={() => setMode('shop')}>ショップ側</ModeButton>
+            <ModeButton active={mode === 'analysis'} onClick={() => setMode('analysis')}>分析側</ModeButton>
           </div>
         </div>
       </div>
@@ -88,8 +123,17 @@ export default function LitePreviewPage() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         {mode === 'owner' ? (
           <OwnerPreview stopped={stopped} setStopped={setStopped} previewUrl={previewUrl} />
+        ) : mode === 'analysis' ? (
+          <AnalysisPreview />
         ) : (
-          <ShopPreview measurements={measurements} judged={judged} rating={rating} setRating={setRating} />
+          <ShopPreview
+            measurements={measurements}
+            judged={judged}
+            rating={rating}
+            setRating={setRating}
+            missingKeys={missingKeys}
+            setMissingKeys={setMissingKeys}
+          />
         )}
 
         <section className="mt-8 border-t border-slate-800 pt-5 text-sm text-slate-400">
@@ -158,7 +202,7 @@ function OwnerPreview({ stopped, setStopped, previewUrl }) {
   )
 }
 
-function ShopPreview({ measurements, judged, rating, setRating }) {
+function ShopPreview({ measurements, judged, rating, setRating, missingKeys, setMissingKeys }) {
   return (
     <>
       <section className="grid gap-5 border-b border-slate-700 pb-6 md:grid-cols-[1fr_360px]">
@@ -167,6 +211,11 @@ function ShopPreview({ measurements, judged, rating, setRating }) {
           <h1 className="mt-1 text-3xl font-bold text-white sm:text-4xl">リビング SPS Reef</h1>
           <p className="mt-3 text-2xl font-bold text-white">180 L</p>
           <p className="mt-2 text-sm text-slate-400">最終測定: 2026年6月6日 10:30</p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <PreviewFact label="水換え頻度" value="14日ごと" />
+            <PreviewFact label="1回の換水量" value="30 L" />
+            <PreviewFact label="最終換水日" value="2026/6/2" />
+          </div>
         </div>
         <div className="aspect-[4/3] overflow-hidden border border-slate-700 bg-slate-900">
           <img src="/lite-review-tank.webp" alt="レビュー用の架空のリーフ水槽" className="h-full w-full object-cover" />
@@ -176,13 +225,22 @@ function ShopPreview({ measurements, judged, rating, setRating }) {
       <section className="mt-6">
         <h2 className="text-lg font-bold text-white">現在値</h2>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {PARAMETERS.map(parameter => (
-            <article key={parameter.key} className={`min-h-28 border-2 p-3 ${SEVERITY_STYLE[judged.get(parameter.key)]}`}>
-              <p className="text-sm font-bold">{LITE_PARAMETER_LABELS[parameter.key]}</p>
+          {PARAMETERS.map(parameter => {
+            const severity = judged.get(parameter.key)
+            const freshness = previewFreshness(SAMPLE_MEASURED_AT[parameter.key])
+            return (
+            <article key={parameter.key} className={`min-h-36 border-2 p-3 ${SEVERITY_STYLE[severity]}`}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold">{LITE_PARAMETER_LABELS[parameter.key]}</p>
+                <span className="border border-current px-2 py-0.5 text-xs font-bold">{SEVERITY_LABEL[severity]}</span>
+              </div>
               <p className="mt-3 text-2xl font-bold">{formatValue(SAMPLE_LATEST[parameter.key], parameter.key)}</p>
               <p className="mt-1 text-xs opacity-80">{parameter.unit}</p>
+              <p className={`mt-3 inline-block border px-2 py-1 text-xs font-bold ${freshness.tone}`}>{freshness.label}</p>
+              <p className="mt-1 text-[11px] opacity-70">{new Date(SAMPLE_MEASURED_AT[parameter.key]).toLocaleDateString('ja-JP')}</p>
             </article>
-          ))}
+            )
+          })}
         </div>
       </section>
 
@@ -228,7 +286,27 @@ function ShopPreview({ measurements, judged, rating, setRating }) {
           ))}
         </div>
         {rating === 'insufficient' && (
-          <textarea rows={3} placeholder="欲しかった情報を教えてください" className="mt-3 w-full border border-slate-600 bg-slate-900 p-3 text-white" />
+          <div className="mt-4 border border-slate-700 bg-slate-900 p-4">
+            <p className="text-sm font-bold text-white">不足していた情報を選択してください（複数可）</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {MISSING_OPTIONS.map(([key, label]) => (
+                <label key={key} className="flex min-h-11 items-center gap-2 border border-slate-700 px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={missingKeys.includes(key)}
+                    onChange={() => setMissingKeys(current => current.includes(key)
+                      ? current.filter(item => item !== key)
+                      : [...current, key])}
+                    className="h-5 w-5"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            {missingKeys.includes('other') && (
+              <textarea rows={3} placeholder="その他に欲しかった情報" className="mt-3 w-full border border-slate-600 bg-slate-950 p-3 text-white" />
+            )}
+          </div>
         )}
         {rating && <p className="mt-3 text-sm text-cyan-200">レビュー用のため、回答は保存されません。</p>}
       </section>
@@ -241,6 +319,70 @@ function Additive({ name, detail }) {
     <div className="p-4">
       <p className="font-bold text-white">{name}</p>
       <p className="mt-1 text-sm text-slate-300">{detail}</p>
+    </div>
+  )
+}
+
+function AnalysisPreview() {
+  const ranking = [
+    ['water_change_frequency', '水換え頻度', 8],
+    ['po4_ppm', 'PO4', 6],
+    ['photo', '写真', 5],
+    ['water_change_volume', '換水量', 4],
+    ['no3_ppm', 'NO3', 3],
+  ]
+
+  return (
+    <section>
+      <p className="text-sm font-bold text-cyan-300">LITE EXPERIMENT</p>
+      <h1 className="mt-1 text-3xl font-bold text-white">実証実験レポート</h1>
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <PreviewMetric label="共有回数" value="32" />
+        <PreviewMetric label="現在有効" value="11" />
+        <PreviewMetric label="閲覧回数" value="47" />
+        <PreviewMetric label="ショップ評価" value="19" />
+      </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <article className="border border-slate-700 bg-slate-900 p-5">
+          <h2 className="text-lg font-bold text-white">ショップ評価</h2>
+          {[['十分', 7], ['ほぼ十分', 8], ['不足', 4]].map(([label, count]) => (
+            <div key={label} className="mt-3 flex items-center justify-between border-b border-slate-800 pb-3">
+              <span>{label}</span><strong className="text-2xl">{count}</strong>
+            </div>
+          ))}
+        </article>
+        <article className="border border-slate-700 bg-slate-900 p-5">
+          <h2 className="text-lg font-bold text-white">不足項目ランキング</h2>
+          <ol className="mt-4 space-y-3">
+            {ranking.map(([key, label, count], index) => (
+              <li key={key} className="grid grid-cols-[28px_1fr_auto] items-center gap-3 border-b border-slate-800 pb-3">
+                <span className="font-bold text-cyan-300">{index + 1}</span>
+                <span>{label}</span>
+                <strong className="text-xl">{count}</strong>
+              </li>
+            ))}
+          </ol>
+        </article>
+      </div>
+      <p className="mt-4 text-xs text-slate-500">レビュー用の架空集計です。本番ではショップ回答から自動集計します。</p>
+    </section>
+  )
+}
+
+function PreviewMetric({ label, value }) {
+  return (
+    <div className="border border-slate-700 bg-slate-900 p-4">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
+    </div>
+  )
+}
+
+function PreviewFact({ label, value }) {
+  return (
+    <div className="border border-slate-700 bg-slate-900 p-3">
+      <p className="text-[11px] text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-bold text-white">{value}</p>
     </div>
   )
 }

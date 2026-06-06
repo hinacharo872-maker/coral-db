@@ -26,6 +26,27 @@ const SEVERITY_STYLE = {
   unknown: 'border-slate-600 bg-slate-900 text-slate-300',
 }
 
+const SEVERITY_LABEL = {
+  green: '緑',
+  yellow: '黄',
+  red: '赤',
+  unknown: '未測定',
+}
+
+const MISSING_OPTIONS = [
+  ['kh_dkh', 'KH'],
+  ['temperature_c', '水温'],
+  ['salinity_sg', '塩分'],
+  ['no3_ppm', 'NO3'],
+  ['po4_ppm', 'PO4'],
+  ['tank_volume', '水量'],
+  ['water_change_frequency', '水換え頻度'],
+  ['water_change_volume', '換水量'],
+  ['additives', '添加剤'],
+  ['photo', '写真'],
+  ['other', 'その他'],
+]
+
 function getVisitorKey() {
   const storageKey = 'lite_shop_visitor_key'
   try {
@@ -47,6 +68,26 @@ function formatValue(value, key) {
   return Number(value).toFixed(key === 'temperature_c' || key === 'kh_dkh' ? 1 : 0)
 }
 
+function elapsedDays(dateText) {
+  if (!dateText) return null
+  const measured = new Date(dateText)
+  if (Number.isNaN(measured.getTime())) return null
+  return Math.max(0, Math.floor((Date.now() - measured.getTime()) / 86400000))
+}
+
+function freshnessFor(dateText) {
+  const days = elapsedDays(dateText)
+  if (days == null) return { days: null, label: '測定日不明', tone: 'border-slate-600 bg-slate-800 text-slate-300' }
+  if (days >= 14) return { days, label: `${days}日前`, tone: 'border-rose-500 bg-rose-950 text-rose-200' }
+  if (days >= 7) return { days, label: `${days}日前`, tone: 'border-amber-400 bg-amber-950 text-amber-200' }
+  return { days, label: days === 0 ? '今日' : `${days}日前`, tone: 'border-emerald-500 bg-emerald-950 text-emerald-200' }
+}
+
+function formatDate(dateText) {
+  if (!dateText) return '未登録'
+  return new Date(dateText).toLocaleDateString('ja-JP')
+}
+
 export default function SharedShopRecordPage() {
   const { token } = useParams()
   const [record, setRecord] = useState(null)
@@ -54,6 +95,7 @@ export default function SharedShopRecordPage() {
   const [error, setError] = useState('')
   const [rating, setRating] = useState('')
   const [missingInfo, setMissingInfo] = useState('')
+  const [missingKeys, setMissingKeys] = useState([])
   const [feedbackSent, setFeedbackSent] = useState(false)
   const [sending, setSending] = useState(false)
 
@@ -72,22 +114,27 @@ export default function SharedShopRecordPage() {
   }, [token])
 
   const checks = useMemo(() => {
-    if (!record?.latest_measurement) return PARAMETERS.map(item => `${LITE_PARAMETER_LABELS[item.key]}未測定`)
-    const missing = findMissingKeys(record.latest_measurement).map(key => `${LITE_PARAMETER_LABELS[key]}未測定`)
-    const outside = judgeAll(record.latest_measurement)
+    const latestValues = Object.fromEntries(PARAMETERS.map(item => [
+      item.key,
+      record?.parameter_latest?.[item.key]?.value ?? null,
+    ]))
+    const missing = findMissingKeys(latestValues).map(key => `${LITE_PARAMETER_LABELS[key]}未測定`)
+    const outside = judgeAll(latestValues)
       .filter(item => item.severity === 'yellow' || item.severity === 'red')
       .map(item => `${LITE_PARAMETER_LABELS[item.parameterKey]}${item.severity === 'red' ? 'が大きく範囲外' : 'を確認'}`)
     return [...missing, ...outside]
   }, [record])
 
   async function submitFeedback() {
-    if (!rating || (rating === 'insufficient' && !missingInfo.trim())) return
+    if (!rating || (rating === 'insufficient' && missingKeys.length === 0)) return
+    if (rating === 'insufficient' && missingKeys.includes('other') && !missingInfo.trim()) return
     setSending(true)
     setError('')
     const { error } = await supabase.rpc('submit_shop_feedback', {
       p_token: token,
       p_rating: rating,
       p_missing_info: rating === 'insufficient' ? missingInfo : null,
+      p_missing_keys: rating === 'insufficient' ? missingKeys : [],
     })
     if (error) setError('評価を保存できませんでした。')
     else setFeedbackSent(true)
@@ -107,7 +154,11 @@ export default function SharedShopRecordPage() {
 
   const photo = record.latest_photo?.photo_url || record.tank?.photo_url
   const latest = record.latest_measurement
-  const judgedLatest = new Map(judgeAll(latest).map(item => [item.parameterKey, item.severity]))
+  const latestValues = Object.fromEntries(PARAMETERS.map(item => [
+    item.key,
+    record.parameter_latest?.[item.key]?.value ?? null,
+  ]))
+  const judgedLatest = new Map(judgeAll(latestValues).map(item => [item.parameterKey, item.severity]))
 
   return (
     <PageShell>
@@ -121,6 +172,11 @@ export default function SharedShopRecordPage() {
           <p className="mt-2 text-sm text-slate-400">
             最終測定: {latest?.measured_at ? new Date(latest.measured_at).toLocaleString('ja-JP') : '未測定'}
           </p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <TankFact label="水換え頻度" value={record.tank?.water_change_frequency_days ? `${record.tank.water_change_frequency_days}日ごと` : '未登録'} />
+            <TankFact label="1回の換水量" value={record.tank?.water_change_volume_liters ? `${record.tank.water_change_volume_liters} L` : '未登録'} />
+            <TankFact label="最終換水日" value={formatDate(record.tank?.last_water_change_at)} />
+          </div>
         </div>
         <div className="aspect-[4/3] overflow-hidden border border-slate-700 bg-slate-900">
           {photo
@@ -133,13 +189,20 @@ export default function SharedShopRecordPage() {
         <h2 className="text-lg font-bold text-white">現在値</h2>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {PARAMETERS.map(parameter => {
-            const value = latest?.[parameter.key]
+            const parameterLatest = record.parameter_latest?.[parameter.key]
+            const value = parameterLatest?.value
             const severity = judgedLatest.get(parameter.key) || 'unknown'
+            const freshness = freshnessFor(parameterLatest?.measured_at)
             return (
-              <article key={parameter.key} className={`min-h-28 border-2 p-3 ${SEVERITY_STYLE[severity]}`}>
-                <p className="text-sm font-bold">{LITE_PARAMETER_LABELS[parameter.key]}</p>
+              <article key={parameter.key} className={`min-h-36 border-2 p-3 ${SEVERITY_STYLE[severity]}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold">{LITE_PARAMETER_LABELS[parameter.key]}</p>
+                  <span className="border border-current px-2 py-0.5 text-xs font-bold">{SEVERITY_LABEL[severity]}</span>
+                </div>
                 <p className="mt-3 text-2xl font-bold">{formatValue(value, parameter.key)}</p>
                 {value != null && <p className="mt-1 text-xs opacity-80">{parameter.unit}</p>}
+                <p className={`mt-3 inline-block border px-2 py-1 text-xs font-bold ${freshness.tone}`}>{freshness.label}</p>
+                <p className="mt-1 text-[11px] opacity-70">{formatDate(parameterLatest?.measured_at)}</p>
               </article>
             )
           })}
@@ -205,18 +268,38 @@ export default function SharedShopRecordPage() {
               ))}
             </div>
             {rating === 'insufficient' && (
-              <textarea
-                value={missingInfo}
-                onChange={event => setMissingInfo(event.target.value)}
-                maxLength={1000}
-                rows={4}
-                placeholder="欲しかった情報を教えてください"
-                className="mt-3 w-full border border-slate-600 bg-slate-900 p-3 text-white"
-              />
+              <div className="mt-4 border border-slate-700 bg-slate-900 p-4">
+                <p className="text-sm font-bold text-white">不足していた情報を選択してください（複数可）</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {MISSING_OPTIONS.map(([key, label]) => (
+                    <label key={key} className="flex min-h-11 items-center gap-2 border border-slate-700 px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={missingKeys.includes(key)}
+                        onChange={() => setMissingKeys(current => current.includes(key)
+                          ? current.filter(item => item !== key)
+                          : [...current, key])}
+                        className="h-5 w-5"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {missingKeys.includes('other') && (
+                  <textarea
+                    value={missingInfo}
+                    onChange={event => setMissingInfo(event.target.value)}
+                    maxLength={1000}
+                    rows={3}
+                    placeholder="その他に欲しかった情報"
+                    className="mt-3 w-full border border-slate-600 bg-slate-950 p-3 text-white"
+                  />
+                )}
+              </div>
             )}
             <button
               type="button"
-              disabled={!rating || sending || (rating === 'insufficient' && !missingInfo.trim())}
+              disabled={!rating || sending || (rating === 'insufficient' && (missingKeys.length === 0 || (missingKeys.includes('other') && !missingInfo.trim())))}
               onClick={submitFeedback}
               className="mt-3 min-h-12 w-full bg-cyan-400 px-5 py-3 font-bold text-slate-950 disabled:bg-slate-700 disabled:text-slate-400 sm:w-auto"
             >
@@ -280,6 +363,15 @@ function StateMessage({ title, body }) {
       <h1 className="text-2xl font-bold text-white">{title}</h1>
       <p className="mt-3 text-slate-300">{body}</p>
     </section>
+  )
+}
+
+function TankFact({ label, value }) {
+  return (
+    <div className="border border-slate-700 bg-slate-900 p-3">
+      <p className="text-[11px] text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-bold text-white">{value}</p>
+    </div>
   )
 }
 

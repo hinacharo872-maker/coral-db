@@ -143,6 +143,12 @@ The first Lite experiment measures one complete loop:
 6. Admins review aggregate sharing, viewing, ratings, and missing-information
    responses.
 
+The shop record also exposes water-change frequency, normal change volume,
+last water-change date, and a separate measurement date for every Lite
+parameter. Values seven days old are marked yellow and values fourteen days
+old are marked red. Insufficient feedback uses structured multi-select keys so
+the admin report can rank missing information quantitatively.
+
 AI diagnosis, ICP interpretation, consumption-rate calculation, and dose
 calculation remain outside this experiment.
 
