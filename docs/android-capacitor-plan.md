@@ -96,12 +96,12 @@ Login never silently overwrites device or cloud data.
 
 When both sides contain data, show three explicit choices:
 
-1. **この端末のデータを使う**  
+1. **この端末のデータを使う**
    Keep the device set as the working copy. Conflicting cloud records remain
    recoverable until the user confirms upload.
-2. **クラウドのデータを使う**  
+2. **クラウドのデータを使う**
    Download the cloud set after creating a device backup.
-3. **クラウドへコピーする**  
+3. **クラウドへコピーする**
    Upload non-conflicting device records. Present individual conflicts for
    review instead of overwriting them.
 
