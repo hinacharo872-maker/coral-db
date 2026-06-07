@@ -117,6 +117,47 @@ Production URL:
 https://coral-db.vercel.app/
 ```
 
+## Android Development
+
+The Android MVP uses Capacitor 8 and opens the deployed Aqua Reef Log web app
+inside a native Android project. This keeps the existing Next.js and Supabase
+behavior intact while native features are introduced gradually.
+
+Requirements:
+
+- Node.js 22 or later
+- Android Studio 2025.2.1 or later
+- Android SDK API 24 or later
+
+Create or refresh the Android project:
+
+```bash
+npm run android:sync
+```
+
+Open it in Android Studio:
+
+```bash
+npm run android:open
+```
+
+Build a debug APK:
+
+```bash
+npm run android:build
+```
+
+The debug APK is generated at:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+The current MVP loads `https://coral-db.vercel.app` and therefore requires an
+internet connection. Before a Google Play production release, move the
+production web assets into the app package and complete native deep-link,
+notification, icon, splash screen, signing, and offline-storage work.
+
 ## Current MVP Scope
 
 The release-ready focus is water quality management:

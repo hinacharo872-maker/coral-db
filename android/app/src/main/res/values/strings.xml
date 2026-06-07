@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Aqua Reef Log</string>
+    <string name="title_activity_main">Aqua Reef Log</string>
+    <string name="package_name">jp.aquareeflog.app</string>
+    <string name="custom_url_scheme">jp.aquareeflog.app</string>
+</resources>

@@ -19,3 +19,8 @@ env.local
 # misc
 .DS_Store
 *.log
+
+# Android local settings and build output
+android/.gradle/
+android/local.properties
+android/**/build/
