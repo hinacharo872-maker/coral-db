@@ -35,6 +35,7 @@ function RecordForm() {
   const definition = RECORD_TYPES[type] || RECORD_TYPES['water-change']
   const [session, setSession] = useState(null)
   const [tank, setTank] = useState(null)
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -43,14 +44,19 @@ function RecordForm() {
     tankVolume: '',
     frequencyDays: '',
     amountLiters: '',
+    routineAmountLiters: '',
     changedAt: new Date().toISOString().slice(0, 10),
     brand: '',
     productName: '',
     doseAmount: '',
     frequency: 'unknown',
     note: '',
+    additiveId: '',
+    productSearch: '',
+    isActive: true,
     photoData: '',
     photoName: '',
+    takenAt: new Date().toISOString().slice(0, 10),
   })
 
   useEffect(() => {
@@ -61,19 +67,29 @@ function RecordForm() {
         setLoading(false)
         return
       }
-      const { data, error } = await supabase
-        .from('lite_tank_profiles')
-        .select('id, display_name, tank_volume_liters, water_change_frequency_days, water_change_volume_liters')
-        .eq('id', tankId)
-        .single()
+      const [tankResult, productsResult] = await Promise.all([
+        supabase
+          .from('lite_tank_profiles')
+          .select('id, display_name, tank_volume_liters, water_change_frequency_days, water_change_volume_liters')
+          .eq('id', tankId)
+          .single(),
+        supabase
+          .from('additive_products')
+          .select('id, brand, name, category, default_unit')
+          .order('brand')
+          .order('sort_order')
+          .limit(1000),
+      ])
+      const { data, error } = tankResult
       if (error) setError('水槽を読み込めませんでした。')
       else {
         setTank(data)
+        if (!productsResult.error) setProducts(productsResult.data ?? [])
         setForm(current => ({
           ...current,
           tankVolume: data.tank_volume_liters ?? '',
           frequencyDays: data.water_change_frequency_days ?? '',
-          amountLiters: data.water_change_volume_liters ?? '',
+          routineAmountLiters: data.water_change_volume_liters ?? '',
         }))
       }
       setLoading(false)
@@ -101,15 +117,15 @@ function RecordForm() {
     let result
 
     if (type === 'water-change') {
-      result = await supabase
-        .from('lite_tank_profiles')
-        .update({
-          tank_volume_liters: nullableNumber(form.tankVolume),
-          water_change_frequency_days: nullableNumber(form.frequencyDays),
-          water_change_volume_liters: nullableNumber(form.amountLiters),
-          last_water_change_at: form.changedAt || null,
-        })
-        .eq('id', tankId)
+      result = await supabase.rpc('record_lite_water_change', {
+        p_tank_id: tankId,
+        p_changed_at: form.changedAt || new Date().toISOString().slice(0, 10),
+        p_amount_liters: nullableNumber(form.amountLiters),
+        p_note: form.note.trim() || null,
+        p_tank_volume_liters: nullableNumber(form.tankVolume),
+        p_frequency_days: nullableInteger(form.frequencyDays),
+        p_routine_volume_liters: nullableNumber(form.routineAmountLiters),
+      })
     } else if (type === 'additive') {
       if (!form.productName.trim()) {
         setError('添加剤の商品名を入力してください。')
@@ -119,13 +135,15 @@ function RecordForm() {
       result = await supabase.from('lite_additive_usage').insert({
         tank_id: tankId,
         user_id: session.user.id,
+        additive_id: form.additiveId || null,
         brand_snapshot: form.brand.trim() || null,
         product_name_snapshot: form.productName.trim(),
         amount_text: form.doseAmount.trim() || null,
         frequency: form.frequency,
         usage_note: form.note.trim() || null,
-        is_active: true,
+        is_active: form.isActive,
         started_at: new Date().toISOString().slice(0, 10),
+        stopped_at: form.isActive ? null : new Date().toISOString().slice(0, 10),
       })
     } else {
       if (!form.photoData) {
@@ -137,7 +155,7 @@ function RecordForm() {
         tank_id: tankId,
         user_id: session.user.id,
         photo_url: form.photoData,
-        taken_at: new Date().toISOString(),
+        taken_at: new Date(`${form.takenAt || new Date().toISOString().slice(0, 10)}T12:00:00`).toISOString(),
         note: form.note.trim() || null,
       })
     }
@@ -184,16 +202,53 @@ function RecordForm() {
             <>
               <NumberField label="水槽サイズ" unit="L" value={form.tankVolume} onChange={value => setField(setForm, 'tankVolume', value)} />
               <NumberField label="水換え頻度" unit="日ごと" value={form.frequencyDays} onChange={value => setField(setForm, 'frequencyDays', value)} />
+              <NumberField label="通常の1回換水量" unit="L" value={form.routineAmountLiters} onChange={value => setField(setForm, 'routineAmountLiters', value)} />
               <NumberField label="今回の換水量" unit="L" value={form.amountLiters} onChange={value => setField(setForm, 'amountLiters', value)} required />
               <label className="block">
                 <span className="text-sm font-bold text-slate-200">水換え日</span>
                 <input type="date" required value={form.changedAt} onChange={event => setField(setForm, 'changedAt', event.target.value)} className="mt-1 min-h-14 w-full border border-slate-600 bg-slate-950 px-4 text-lg text-white" />
+              </label>
+              <label className="block">
+                <span className="text-sm font-bold text-slate-200">メモ</span>
+                <textarea rows={3} value={form.note} onChange={event => setField(setForm, 'note', event.target.value)} placeholder="コケ掃除も行った、など" className="mt-1 w-full border border-slate-600 bg-slate-950 p-4 text-base text-white" />
               </label>
             </>
           )}
 
           {type === 'additive' && (
             <>
+              <label className="block">
+                <span className="text-sm font-bold text-slate-200">登録済み添加剤から検索</span>
+                <input
+                  type="search"
+                  value={form.productSearch}
+                  onChange={event => setField(setForm, 'productSearch', event.target.value)}
+                  placeholder="メーカー名または商品名"
+                  className="mt-1 min-h-14 w-full border border-slate-600 bg-slate-950 px-4 text-lg text-white"
+                />
+              </label>
+              {form.productSearch.trim() && (
+                <div className="max-h-56 overflow-y-auto border border-slate-700 bg-slate-900">
+                  {filterProducts(products, form.productSearch).length ? filterProducts(products, form.productSearch).map(product => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      onClick={() => setForm(current => ({
+                        ...current,
+                        additiveId: product.id,
+                        brand: product.brand || '',
+                        productName: product.name || '',
+                        productSearch: '',
+                      }))}
+                      className="block min-h-12 w-full border-b border-slate-800 px-4 py-3 text-left last:border-0"
+                    >
+                      <strong className="text-white">{product.brand} {product.name}</strong>
+                      <span className="mt-0.5 block text-xs text-slate-400">{product.category || 'カテゴリ未登録'}</span>
+                    </button>
+                  )) : <p className="p-4 text-sm text-slate-400">見つかりません。下の欄へ手入力できます。</p>}
+                </div>
+              )}
+              {form.additiveId && <p className="border border-emerald-700 bg-emerald-950 p-3 text-sm text-emerald-100">添加剤DBの商品と連携しました。</p>}
               <TextField label="メーカー" value={form.brand} onChange={value => setField(setForm, 'brand', value)} placeholder="例: Red Sea" />
               <TextField label="商品名" value={form.productName} onChange={value => setField(setForm, 'productName', value)} placeholder="例: Reef Foundation B" required />
               <TextField label="1回の数量" value={form.doseAmount} onChange={value => setField(setForm, 'doseAmount', value)} placeholder="例: 5 ml" />
@@ -202,6 +257,13 @@ function RecordForm() {
                 <select value={form.frequency} onChange={event => setField(setForm, 'frequency', event.target.value)} className="mt-1 min-h-14 w-full border border-slate-600 bg-slate-950 px-4 text-lg text-white">
                   {FREQUENCIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
+              </label>
+              <label className="flex min-h-14 items-center gap-3 border border-slate-600 bg-slate-900 px-4 py-3">
+                <input type="checkbox" checked={form.isActive} onChange={event => setField(setForm, 'isActive', event.target.checked)} className="h-6 w-6" />
+                <span>
+                  <strong className="block text-white">現在使用中</strong>
+                  <span className="text-xs text-slate-400">停止済みとして残す場合はチェックを外します</span>
+                </span>
               </label>
             </>
           )}
@@ -212,6 +274,10 @@ function RecordForm() {
                 <span className="block text-lg font-bold text-white">水槽写真を選ぶ</span>
                 <span className="mt-1 block text-sm text-slate-400">カメラ撮影または写真一覧から選択</span>
                 <input type="file" accept="image/*" capture="environment" onChange={onPhotoSelected} className="mt-4 block w-full text-sm text-slate-300" />
+              </label>
+              <label className="block">
+                <span className="text-sm font-bold text-slate-200">撮影日</span>
+                <input type="date" required value={form.takenAt} onChange={event => setField(setForm, 'takenAt', event.target.value)} className="mt-1 min-h-14 w-full border border-slate-600 bg-slate-950 px-4 text-lg text-white" />
               </label>
               {form.photoData && <img src={form.photoData} alt="追加する水槽写真" className="max-h-80 w-full object-contain border border-slate-700 bg-black" />}
             </>
@@ -245,6 +311,20 @@ function nullableNumber(value) {
   return Number.isFinite(number) ? number : null
 }
 
+function nullableInteger(value) {
+  if (value === '') return null
+  const number = Number.parseInt(value, 10)
+  return Number.isFinite(number) ? number : null
+}
+
+function filterProducts(products, query) {
+  const normalized = query.trim().toLowerCase()
+  if (!normalized) return []
+  return products
+    .filter(product => `${product.brand || ''} ${product.name || ''} ${product.category || ''}`.toLowerCase().includes(normalized))
+    .slice(0, 12)
+}
+
 function NumberField({ label, unit, value, onChange, required = false }) {
   return (
     <label className="block">
@@ -274,13 +354,13 @@ function resizeImage(file) {
       const image = new Image()
       image.onerror = reject
       image.onload = () => {
-        const maxSize = 1280
+        const maxSize = 960
         const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
         const canvas = document.createElement('canvas')
         canvas.width = Math.round(image.width * scale)
         canvas.height = Math.round(image.height * scale)
         canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.78))
+        resolve(canvas.toDataURL('image/jpeg', 0.7))
       }
       image.src = reader.result
     }

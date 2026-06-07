@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Header from '@/components/Header'
 import { supabase } from '@/lib/supabase'
 import { LITE_MEASUREMENT_STEPS } from '@/lib/liteMeasurement'
+import { LITE_PARAMETER_LABELS, judgeAll } from '@/lib/liteTargets'
 
 export default function LiteHomePage() {
   const [session, setSession] = useState(null)
@@ -63,7 +64,15 @@ export default function LiteHomePage() {
       if (!measurementResult.error) {
         const latest = {}
         for (const record of measurementResult.data ?? []) {
-          if (!latest[record.tank_id]) latest[record.tank_id] = record
+          if (!latest[record.tank_id]) {
+            latest[record.tank_id] = { measured_at: record.measured_at, parameter_dates: {} }
+          }
+          for (const step of LITE_MEASUREMENT_STEPS) {
+            if (latest[record.tank_id][step.key] == null && record[step.key] != null) {
+              latest[record.tank_id][step.key] = record[step.key]
+              latest[record.tank_id].parameter_dates[step.key] = record.measured_at
+            }
+          }
         }
         setLatestByTank(latest)
       }
@@ -149,6 +158,18 @@ function TankHomeCard({ tank, latest }) {
     { href: `/lite/record?type=photo&tank=${tank.id}`, label: '写真を追加' },
     { href: `/lite/shop-card?tank=${tank.id}`, label: 'ショップに見せる', shop: true },
   ]
+  const judged = judgeAll(latest)
+  const redCount = judged.filter(item => item.severity === 'red').length
+  const yellowCount = judged.filter(item => item.severity === 'yellow').length
+  const missing = judged.filter(item => item.severity === 'unknown')
+  const todayStatus = redCount
+    ? { label: 'ショップに見せて相談', tone: 'border-rose-500 bg-rose-950 text-rose-100' }
+    : yellowCount
+      ? { label: '確認したい項目あり', tone: 'border-amber-400 bg-amber-950 text-amber-100' }
+      : missing.length === judged.length
+        ? { label: '記録を始めましょう', tone: 'border-slate-600 bg-slate-950 text-slate-200' }
+        : { label: '大きな確認なし', tone: 'border-emerald-500 bg-emerald-950 text-emerald-100' }
+  const nextKey = missing[0]?.parameterKey
 
   return (
     <article className="border border-slate-700 bg-slate-900 p-5">
@@ -159,6 +180,26 @@ function TankHomeCard({ tank, latest }) {
         </div>
         <span className="border border-cyan-700 px-2 py-1 text-xs font-bold text-cyan-200">Lite</span>
       </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className={`border-2 p-3 sm:col-span-1 ${todayStatus.tone}`}>
+          <p className="text-[11px] font-bold opacity-75">今日の状態</p>
+          <p className="mt-1 font-bold">{todayStatus.label}</p>
+        </div>
+        <div className="border border-slate-700 bg-slate-950 p-3">
+          <p className="text-[11px] text-slate-400">最後の記録日</p>
+          <p className="mt-1 font-bold text-white">{latest?.measured_at ? new Date(latest.measured_at).toLocaleDateString('ja-JP') : 'まだありません'}</p>
+        </div>
+        <div className="border border-slate-700 bg-slate-950 p-3">
+          <p className="text-[11px] text-slate-400">次に測ると良い項目</p>
+          <p className="mt-1 font-bold text-white">{nextKey ? LITE_PARAMETER_LABELS[nextKey] : '5項目そろっています'}</p>
+        </div>
+      </div>
+      {missing.length > 0 && (
+        <p className="mt-2 text-xs text-slate-400">
+          今回まだ測っていない項目: {missing.map(item => LITE_PARAMETER_LABELS[item.parameterKey]).join('、')}
+        </p>
+      )}
 
       <div className="mt-4 grid grid-cols-5 gap-1">
         {LITE_MEASUREMENT_STEPS.map(step => (

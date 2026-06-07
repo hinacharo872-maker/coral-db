@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import { supabase } from '@/lib/supabase'
-import { LITE_PARAMETER_LABELS, findMissingKeys, judgeAll } from '@/lib/liteTargets'
+import { LITE_PARAMETER_LABELS, LITE_TARGETS, findMissingKeys, judgeAll } from '@/lib/liteTargets'
 
 const PARAMETERS = [
   { key: 'kh_dkh', unit: 'dKH' },
@@ -193,6 +193,9 @@ function LiteShopCard() {
                 {latest?.value != null && <p className="text-xs opacity-80">{parameter.unit}</p>}
                 <p className={`mt-2 text-xs font-bold ${freshness.tone}`}>{freshness.label}</p>
                 <p className="mt-0.5 text-[10px] opacity-70">{formatDate(latest?.measured_at)}</p>
+                <p className="mt-2 border-t border-current/30 pt-1 text-[10px] opacity-80">
+                  目標 {formatTarget(parameter.key)}
+                </p>
               </article>
             )
           })}
@@ -222,6 +225,11 @@ function LiteShopCard() {
           </div>
         </section>
       </div>
+
+      <section className="mt-4 border border-slate-700 bg-slate-900 p-3 text-xs leading-relaxed text-slate-400">
+        <p>これは診断ではありません。ショップが確認するための記録です。</p>
+        <p className="mt-1">添加や購入の判断は、この画面を見ながらショップと相談してください。</p>
+      </section>
     </PageShell>
   )
 }
@@ -242,9 +250,16 @@ function formatDate(value) {
 function getFreshness(value) {
   if (!value) return { label: '測定日不明', tone: 'text-slate-400' }
   const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000))
-  if (days >= 14) return { label: `${days}日前`, tone: 'text-rose-200' }
-  if (days >= 7) return { label: `${days}日前`, tone: 'text-amber-200' }
+  if (days >= 14) return { label: `${days}日前・古い可能性`, tone: 'text-rose-200' }
+  if (days >= 7) return { label: `${days}日前・少し古い`, tone: 'text-amber-200' }
   return { label: days === 0 ? '今日' : `${days}日前`, tone: 'text-emerald-200' }
+}
+
+function formatTarget(key) {
+  const target = LITE_TARGETS[key]
+  if (!target) return '未設定'
+  const decimals = key === 'salinity_sg' ? 3 : key === 'po4_ppm' ? 2 : 1
+  return `${target.green[0].toFixed(decimals)}-${target.green[1].toFixed(decimals)}`
 }
 
 function Fact({ label, value }) {

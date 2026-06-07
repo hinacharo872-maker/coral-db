@@ -132,12 +132,18 @@ function LiteMeasureFlow() {
 
   if (saved) {
     const count = LITE_MEASUREMENT_STEPS.filter(step => values[step.key] !== '' && values[step.key] != null).length
+    const skipped = LITE_MEASUREMENT_STEPS.filter(step => values[step.key] === '' || values[step.key] == null)
     return (
       <Shell>
         <section className="mx-auto max-w-xl text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400 text-3xl font-bold text-slate-950">✓</div>
           <h1 className="mt-5 text-3xl font-bold text-white">記録できました</h1>
           <p className="mt-3 text-slate-300">{count}項目を水槽カルテへ追加しました。測れなかった項目があっても問題ありません。</p>
+          {skipped.length > 0 && (
+            <p className="mt-4 border border-amber-700 bg-amber-950 p-4 text-left text-sm text-amber-100">
+              次に {skipped.map(step => step.label).join('、')} を測ると、ショップが助言しやすくなります。
+            </p>
+          )}
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
             <Link href="/lite" className="flex min-h-14 items-center justify-center bg-cyan-400 px-5 py-3 text-lg font-bold text-slate-950">Liteホームへ</Link>
             <Link href={`/lite/shop-card?tank=${tankId}`} className="flex min-h-14 items-center justify-center border border-cyan-600 px-5 py-3 text-lg font-bold text-cyan-100">ショップに見せる</Link>
