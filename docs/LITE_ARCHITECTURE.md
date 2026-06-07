@@ -195,6 +195,11 @@ consultation, and does not open a direct purchase route. If verified
 `additive_effects` is empty, all product routing is disabled and the user is
 sent to shop consultation.
 
+Extreme temperature, KH, and salinity values are the only single-reading
+exception. Thresholds live in `LITE_EMERGENCY_THRESHOLDS`. These readings
+immediately ask the user to verify the measurement and show the shop record,
+but never open owned-product or purchase routes.
+
 Pro or ICP is suggested from a realistic thirty-day habit check: at least eight
 measurement days, parameter-specific coverage, few red values, and no large
 swings. Consecutive daily logging is not required.

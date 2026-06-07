@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildLiteAdvice, isRepeatedOutOfRange, shouldSuggestProOrIcp } from '../lib/liteRecommendations.js'
+import {
+  buildLiteAdvice,
+  isRepeatedOutOfRange,
+  shouldSuggestProOrIcp,
+} from '../lib/liteRecommendations.js'
 
 const normal = {
   temperature_c: 25,
@@ -28,6 +32,54 @@ test('one low KH reading only asks for another measurement', () => {
   assert.equal(advice.some(item => item.type === 'remeasure'), true)
   assert.equal(advice.some(item => item.type === 'use_owned_additive'), false)
   assert.equal(advice.some(item => item.type === 'buy_additive'), false)
+})
+
+for (const scenario of [
+  { name: 'high temperature', values: { temperature_c: 31 } },
+  { name: 'low temperature', values: { temperature_c: 21 } },
+  { name: 'very low KH', values: { kh_dkh: 4.5 } },
+  { name: 'very low salinity', values: { salinity_sg: 1.018 } },
+  { name: 'very high salinity', values: { salinity_sg: 1.031 } },
+]) {
+  test(`${scenario.name} creates immediate shop advice without product routing`, () => {
+    const advice = buildLiteAdvice({
+      latestMeasurement: { ...normal, ...scenario.values },
+      ownedAdditives: [{ additive_id: 'any-product', is_active: true }],
+      additiveEffects: [effect('any-product', 'kh', 'increase')],
+    })
+    assert.equal(advice.some(item => item.isEmergency === true), true)
+    assert.equal(advice.every(item => item.type === 'consult_shop'), true)
+    assert.equal(advice.some(item => item.type === 'use_owned_additive'), false)
+    assert.equal(advice.some(item => item.type === 'buy_additive'), false)
+  })
+}
+
+test('single high PO4 and NO3 readings are not emergencies', () => {
+  for (const values of [{ po4_ppm: 0.3 }, { no3_ppm: 40 }]) {
+    const advice = buildLiteAdvice({
+      latestMeasurement: { ...normal, ...values },
+      additiveEffects: [
+        effect('po4-product', 'po4', 'decrease'),
+        effect('no3-product', 'no3', 'decrease'),
+      ],
+    })
+    assert.equal(advice.some(item => item.isEmergency === true), false)
+    assert.equal(advice.some(item => item.type === 'remeasure'), true)
+    assert.equal(advice.some(item => item.type === 'buy_additive'), false)
+  }
+})
+
+test('emergency threshold boundary values remain in the normal repeated-reading flow', () => {
+  for (const values of [
+    { temperature_c: 22 },
+    { temperature_c: 30 },
+    { kh_dkh: 5 },
+    { salinity_sg: 1.020 },
+    { salinity_sg: 1.030 },
+  ]) {
+    const advice = buildLiteAdvice({ latestMeasurement: { ...normal, ...values } })
+    assert.equal(advice.some(item => item.isEmergency === true), false)
+  }
 })
 
 test('two low KH readings use an owned verified product without purchase advice', () => {
@@ -165,6 +217,17 @@ test('repeated out-of-range requires two readings in the same direction', () => 
   assert.equal(isRepeatedOutOfRange('kh_dkh', { ...normal, kh_dkh: 6.8 }, previous({ kh_dkh: 6.7 })), true)
   assert.equal(isRepeatedOutOfRange('kh_dkh', { ...normal, kh_dkh: 6.8 }, previous({ kh_dkh: 8 })), false)
   assert.equal(isRepeatedOutOfRange('kh_dkh', { ...normal, kh_dkh: 6.8 }, previous({ kh_dkh: 10.5 })), false)
+})
+
+test('the latest record duplicated in recent measurements counts only once', () => {
+  const latest = {
+    id: 'measurement-1',
+    measured_at: '2026-06-07T00:00:00Z',
+    ...normal,
+    kh_dkh: 6.8,
+  }
+  assert.equal(isRepeatedOutOfRange('kh_dkh', latest, [latest]), false)
+  assert.equal(isRepeatedOutOfRange('kh_dkh', latest, [{ ...latest }]), false)
 })
 
 test('missing measurement prompts are limited and prioritized', () => {
