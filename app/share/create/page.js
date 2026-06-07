@@ -154,7 +154,7 @@ export default function CreateSharePage() {
     try {
       await navigator.share({
         title: `${tankNames.get(link.tank_id) || '水槽'}のショップ用カルテ`,
-        text: 'Aqua Reef Logのショップ用水槽カルテです。',
+        text: 'Coral DBのショップ用水槽カルテです。',
         url,
       })
     } catch (error) {

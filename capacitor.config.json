@@ -1,6 +1,6 @@
 {
   "appId": "jp.aquareeflog.app",
-  "appName": "Aqua Reef Log",
+  "appName": "Coral DB",
   "webDir": "public/capacitor-shell",
   "server": {
     "url": "https://coral-db.vercel.app",

@@ -25,7 +25,7 @@ This boundary protects all three participants:
 
 ## Data Design Rules
 
-1. Existing Aqua Reef Log tables remain unchanged.
+1. Existing Coral DB tables remain unchanged.
 2. Lite data is stored in new `lite_*` tables.
 3. User-entered fields are nullable so partial records remain valid.
 4. Identity, ownership, timestamps, and security columns may be required even
@@ -183,11 +183,15 @@ and do not replace livestock-specific advice.
 review option before presenting a purchase route. It does not calculate or
 recommend a dose.
 
-`buildLiteAdvice()` prioritizes missing measurements, stops product routing
-when multiple values are red, checks owned products before purchase routes,
-and never recommends an additive for temperature correction. Pro or ICP is
-suggested only after a thirty-day daily-record streak, coverage of all five
-Lite parameters, and at least eighty percent of recorded values in green.
+`buildLiteAdvice()` shows at most two prioritized missing measurements, stops
+product routing when multiple values are red, checks owned products before
+purchase routes, and never recommends an additive for temperature, salinity,
+high KH, or low nutrient correction. If `additive_effects` is empty, all
+purchase routing is disabled and the user is sent to shop consultation.
+
+Pro or ICP is suggested from a realistic thirty-day habit check: at least eight
+measurement days, parameter-specific coverage, few red values, and no large
+swings. Consecutive daily logging is not required.
 
 ## Security Plan
 

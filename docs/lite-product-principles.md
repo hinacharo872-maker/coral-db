@@ -1,8 +1,8 @@
-# Aqua Reef Log Lite Product Principles
+# Coral DB Lite Product Principles
 
 ## Product boundary
 
-Aqua Reef Log Lite and Aqua Reef Log Pro are separate products with different
+Coral DB Lite and Coral DB Pro are separate products with different
 users and jobs. Lite is free. Pro is paid.
 
 Lite is for beginners and older users who need a small, forgiving aquarium

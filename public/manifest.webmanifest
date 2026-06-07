@@ -1,6 +1,6 @@
 {
-  "name": "Aqua Reef Log",
-  "short_name": "Reef Log",
+  "name": "Coral DB",
+  "short_name": "Coral DB",
   "description": "Marine aquarium water quality log and trend charts",
   "start_url": "/",
   "display": "standalone",

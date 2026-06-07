@@ -27,6 +27,7 @@ const MISSING_LABELS = {
 export default function LiteExperimentAdminPage() {
   const [loading, setLoading] = useState(true)
   const [metrics, setMetrics] = useState(null)
+  const [effectsCount, setEffectsCount] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -37,9 +38,13 @@ export default function LiteExperimentAdminPage() {
         setLoading(false)
         return
       }
-      const { data, error } = await supabase.rpc('get_lite_experiment_metrics')
-      if (error) setError('管理者権限がないか、集計データを読み込めませんでした。')
-      else setMetrics(data)
+      const [metricsResult, effectsResult] = await Promise.all([
+        supabase.rpc('get_lite_experiment_metrics'),
+        supabase.from('additive_effects').select('id', { count: 'exact', head: true }),
+      ])
+      if (metricsResult.error) setError('管理者権限がないか、集計データを読み込めませんでした。')
+      else setMetrics(metricsResult.data)
+      setEffectsCount(effectsResult.error ? null : effectsResult.count)
       setLoading(false)
     }
     loadMetrics()
@@ -55,6 +60,11 @@ export default function LiteExperimentAdminPage() {
 
         {loading && <p className="mt-8 text-slate-300">集計中...</p>}
         {error && <p className="mt-8 border border-rose-700 bg-rose-950 p-4 text-rose-100">{error}</p>}
+        {effectsCount === 0 && (
+          <p className="mt-5 border-2 border-rose-500 bg-rose-950 p-4 font-bold text-rose-100">
+            additive_effects が未設定です。手持ち添加剤判定が無効になっています。購入ルーティングは安全のため停止されます。
+          </p>
+        )}
 
         {metrics && (
           <>

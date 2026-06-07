@@ -2,11 +2,11 @@ import './globals.css'
 import PwaRegister from '@/components/PwaRegister'
 
 export const metadata = {
-  title: 'Aqua Reef Log',
+  title: 'Coral DB',
   description: '海水水槽の水質記録と推移グラフ',
   manifest: '/manifest.webmanifest',
   icons: { icon: '/app-icon.svg', apple: '/app-icon.svg' },
-  appleWebApp: { capable: true, title: 'Aqua Reef Log', statusBarStyle: 'black-translucent' },
+  appleWebApp: { capable: true, title: 'Coral DB', statusBarStyle: 'black-translucent' },
 }
 
 export const viewport = {

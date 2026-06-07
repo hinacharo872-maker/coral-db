@@ -1,6 +1,6 @@
-# Aqua Reef Log
+# Coral DB
 
-Aqua Reef Log is a marine aquarium management web app for reef keepers who want more than a simple note pad. It helps users record water quality, see what changed since the last measurement, notice risky values, and decide what to check next.
+Coral DB is a marine aquarium management web app for reef keepers who want more than a simple note pad. It helps users record water quality, see what changed since the last measurement, notice risky values, and decide what to check next.
 
 The current MVP focuses on water quality management for SPS/LPS-oriented reef tanks. Coral database features are being prepared separately and are intentionally secondary in this release.
 
@@ -119,7 +119,7 @@ https://coral-db.vercel.app/
 
 ## Android Development
 
-The Android MVP uses Capacitor 8 and opens the deployed Aqua Reef Log web app
+The Android MVP uses Capacitor 8 and opens the deployed Coral DB web app
 inside a native Android project. This keeps the existing Next.js and Supabase
 behavior intact while native features are introduced gradually.
 
