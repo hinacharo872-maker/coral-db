@@ -142,6 +142,14 @@ export default function LiteHomePage() {
 }
 
 function TankHomeCard({ tank, latest }) {
+  const actions = [
+    { href: `/lite/measure?tank=${tank.id}`, label: '水質を記録', primary: true },
+    { href: `/lite/record?type=water-change&tank=${tank.id}`, label: '水換えを記録' },
+    { href: `/lite/record?type=additive&tank=${tank.id}`, label: '添加剤を記録' },
+    { href: `/lite/record?type=photo&tank=${tank.id}`, label: '写真を追加' },
+    { href: `/lite/shop-card?tank=${tank.id}`, label: 'ショップに見せる', shop: true },
+  ]
+
   return (
     <article className="border border-slate-700 bg-slate-900 p-5">
       <div className="flex items-start justify-between gap-3">
@@ -162,12 +170,23 @@ function TankHomeCard({ tank, latest }) {
       </div>
       <p className="mt-2 text-xs text-slate-500">{latest?.measured_at ? `前回の記録: ${new Date(latest.measured_at).toLocaleDateString('ja-JP')}` : 'まだ測定記録はありません。'}</p>
 
-      <Link href={`/lite/measure?tank=${tank.id}`} className="mt-5 flex min-h-14 items-center justify-center bg-cyan-400 px-5 py-3 text-lg font-bold text-slate-950">
-        測定する
-      </Link>
-      <Link href="/share/create" className="mt-2 flex min-h-11 items-center justify-center border border-slate-600 px-4 py-2 text-sm font-bold text-slate-200">
-        ショップカルテを共有
-      </Link>
+      <div className="mt-5 grid grid-cols-2 gap-2">
+        {actions.map(action => (
+          <Link
+            key={action.href}
+            href={action.href}
+            className={`flex min-h-14 items-center justify-center px-3 py-3 text-center font-bold ${
+              action.primary
+                ? 'bg-cyan-400 text-slate-950'
+                : action.shop
+                  ? 'col-span-2 border-2 border-emerald-500 bg-emerald-950 text-emerald-100'
+                  : 'border border-slate-600 bg-slate-950 text-slate-100'
+            }`}
+          >
+            {action.label}
+          </Link>
+        ))}
+      </div>
     </article>
   )
 }

@@ -140,7 +140,7 @@ function LiteMeasureFlow() {
           <p className="mt-3 text-slate-300">{count}項目を水槽カルテへ追加しました。測れなかった項目があっても問題ありません。</p>
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
             <Link href="/lite" className="flex min-h-14 items-center justify-center bg-cyan-400 px-5 py-3 text-lg font-bold text-slate-950">Liteホームへ</Link>
-            <Link href="/share/create" className="flex min-h-14 items-center justify-center border border-cyan-600 px-5 py-3 text-lg font-bold text-cyan-100">ショップカルテへ</Link>
+            <Link href={`/lite/shop-card?tank=${tankId}`} className="flex min-h-14 items-center justify-center border border-cyan-600 px-5 py-3 text-lg font-bold text-cyan-100">ショップに見せる</Link>
           </div>
         </section>
       </Shell>

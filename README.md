@@ -169,6 +169,23 @@ The release-ready focus is water quality management:
 - Export logs before relying on the app long term
 - Recover from input mistakes with edit/delete
 
+### Lite shop consultation
+
+The Lite MVP prioritizes an in-app `Shop view` over QR codes and external
+sharing links. A user can hand their phone to a shop employee and show:
+
+- Tank volume and water-change routine
+- Latest water-change date
+- KH, temperature, salinity, NO3, and PO4 with color zones
+- Measurement date and freshness for every parameter
+- Active additives with amount and frequency
+- Latest tank photo
+- A short list of items worth checking
+
+Lite home provides large mobile actions for water quality, water changes,
+additives, photos, and the shop view. QR and external-link sharing remain
+experimental and are not part of the current primary flow.
+
 The app does not give medical, veterinary, or guaranteed husbandry advice. Suggestions are intentionally phrased as checks, not definitive instructions.
 
 ## Roadmap

@@ -22,5 +22,6 @@ env.local
 
 # Android local settings and build output
 android/.gradle/
+android/.idea/
 android/local.properties
 android/**/build/
