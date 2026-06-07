@@ -178,16 +178,22 @@ and do not replace livestock-specific advice.
 ## Owned-Product Routing
 
 `lib/liteRecommendations.js` contains neutral recommendation helpers.
-`canHandleWithOwnedAdditives()` checks active products against the structured
-`additive_effects` metadata. A match means Lite may show an owned product as a
-review option before presenting a purchase route. It does not calculate or
-recommend a dose.
+`canHandleWithOwnedAdditives()` checks active products against verified
+`additive_effects` metadata. Unverified product effects are excluded from both
+owned-product and purchase routing. A verified match means Lite may show an
+owned product as a review option before presenting a purchase route. It does
+not calculate or recommend a dose.
 
 `buildLiteAdvice()` shows at most two prioritized missing measurements, stops
 product routing when multiple values are red, checks owned products before
 purchase routes, and never recommends an additive for temperature, salinity,
-high KH, or low nutrient correction. If `additive_effects` is empty, all
-purchase routing is disabled and the user is sent to shop consultation.
+high KH, or low nutrient correction. Strong actions require the latest two
+measurements to be outside the target range in the same direction. A single
+abnormal reading only asks the user to measure again. NO3 and PO4 guidance
+checks feeding and water-change habits before owned products or shop
+consultation, and does not open a direct purchase route. If verified
+`additive_effects` is empty, all product routing is disabled and the user is
+sent to shop consultation.
 
 Pro or ICP is suggested from a realistic thirty-day habit check: at least eight
 measurement days, parameter-specific coverage, few red values, and no large

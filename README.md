@@ -158,6 +158,10 @@ internet connection. Before a Google Play production release, move the
 production web assets into the app package and complete native deep-link,
 notification, icon, splash screen, signing, and offline-storage work.
 
+The staged storage, photo, notification, and conflict-safe synchronization
+plan is documented in
+[`docs/android-capacitor-plan.md`](docs/android-capacitor-plan.md).
+
 ## Current MVP Scope
 
 The release-ready focus is water quality management:

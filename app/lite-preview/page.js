@@ -44,11 +44,11 @@ const SEVERITY_STYLE = {
 const SEVERITY_LABEL = { green: '緑', yellow: '黄', red: '赤', unknown: '未測定' }
 
 const MISSING_OPTIONS = [
-  ['kh_dkh', 'KH'],
+  ['kh_dkh', 'KH（炭酸塩硬度）'],
   ['temperature_c', '水温'],
-  ['salinity_sg', '塩分'],
-  ['no3_ppm', 'NO3'],
-  ['po4_ppm', 'PO4'],
+  ['salinity_sg', '塩分濃度'],
+  ['no3_ppm', '硝酸塩（NO3）'],
+  ['po4_ppm', 'リン酸塩（PO4）'],
   ['tank_volume', '水量'],
   ['water_change_frequency', '水換え頻度'],
   ['water_change_volume', '換水量'],

@@ -11,11 +11,11 @@ const RATING_LABELS = {
 }
 
 const MISSING_LABELS = {
-  kh_dkh: 'KH',
+  kh_dkh: 'KH（炭酸塩硬度）',
   temperature_c: '水温',
-  salinity_sg: '塩分',
-  no3_ppm: 'NO3',
-  po4_ppm: 'PO4',
+  salinity_sg: '塩分濃度',
+  no3_ppm: '硝酸塩（NO3）',
+  po4_ppm: 'リン酸塩（PO4）',
   tank_volume: '水量',
   water_change_frequency: '水換え頻度',
   water_change_volume: '換水量',
@@ -40,7 +40,7 @@ export default function LiteExperimentAdminPage() {
       }
       const [metricsResult, effectsResult] = await Promise.all([
         supabase.rpc('get_lite_experiment_metrics'),
-        supabase.from('additive_effects').select('id', { count: 'exact', head: true }),
+        supabase.from('additive_effects').select('id', { count: 'exact', head: true }).eq('verified', true),
       ])
       if (metricsResult.error) setError('管理者権限がないか、集計データを読み込めませんでした。')
       else setMetrics(metricsResult.data)
