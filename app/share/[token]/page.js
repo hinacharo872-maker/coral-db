@@ -33,6 +33,14 @@ const SEVERITY_LABEL = {
   unknown: '未測定',
 }
 
+const FREQUENCY_LABELS = {
+  daily: '毎日',
+  every_2_days: '2日に1回',
+  weekly: '週1回',
+  as_needed: '必要なとき',
+  unknown: '頻度未登録',
+}
+
 const MISSING_OPTIONS = [
   ['kh_dkh', 'KH'],
   ['temperature_c', '水温'],
@@ -225,7 +233,7 @@ export default function SharedShopRecordPage() {
             {record.additives?.length ? record.additives.map((additive, index) => (
               <div key={`${additive.brand}-${additive.product_name}-${index}`} className="border-b border-slate-800 p-4 last:border-b-0">
                 <p className="font-bold text-white">{[additive.brand, additive.product_name].filter(Boolean).join(' ') || '名称未登録'}</p>
-                <p className="mt-1 text-sm text-slate-300">{[additive.amount, additive.frequency].filter(Boolean).join(' / ')}</p>
+                <p className="mt-1 text-sm text-slate-300">{[additive.amount, FREQUENCY_LABELS[additive.frequency] || '頻度未登録'].filter(Boolean).join(' / ')}</p>
                 {additive.note && <p className="mt-1 text-xs text-slate-400">{additive.note}</p>}
               </div>
             )) : <p className="p-4 text-sm text-slate-400">使用中の添加剤は登録されていません。</p>}

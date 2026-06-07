@@ -62,7 +62,7 @@ export default function LiteExperimentAdminPage() {
         {error && <p className="mt-8 border border-rose-700 bg-rose-950 p-4 text-rose-100">{error}</p>}
         {effectsCount === 0 && (
           <p className="mt-5 border-2 border-rose-500 bg-rose-950 p-4 font-bold text-rose-100">
-            additive_effects が未設定です。手持ち添加剤判定が無効になっています。購入ルーティングは安全のため停止されます。
+            添加剤の判定情報がまだ準備できていません。手持ち製品との照合と商品案内は、安全のため停止しています。
           </p>
         )}
 
@@ -95,7 +95,7 @@ export default function LiteExperimentAdminPage() {
                     {metrics.missing_key_ranking.map((item, index) => (
                       <li key={`${item.key}-${index}`} className="grid grid-cols-[32px_1fr_auto] gap-2 border-b border-slate-800 pb-3">
                         <span className="font-bold text-cyan-300">{index + 1}</span>
-                        <span className="text-sm text-slate-200">{MISSING_LABELS[item.key] || item.key}</span>
+                        <span className="text-sm text-slate-200">{MISSING_LABELS[item.key] || 'その他の情報'}</span>
                         <span className="font-bold text-white">{item.count}</span>
                       </li>
                     ))}

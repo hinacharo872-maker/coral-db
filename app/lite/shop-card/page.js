@@ -209,7 +209,7 @@ function LiteShopCard() {
             <div key={`${additive.product_name_snapshot}-${index}`} className="border-b border-slate-800 px-3 py-2 last:border-0">
               <p className="font-bold text-white">{[additive.brand_snapshot, additive.product_name_snapshot].filter(Boolean).join(' ') || '名称未登録'}</p>
               <p className="mt-0.5 text-sm text-slate-300">
-                {[additive.amount_text, FREQUENCY_LABELS[additive.frequency] || additive.frequency].filter(Boolean).join(' / ')}
+                {[additive.amount_text, FREQUENCY_LABELS[additive.frequency] || '頻度未登録'].filter(Boolean).join(' / ')}
               </p>
             </div>
           )) : <p className="p-3 text-sm text-slate-400">使用中の添加剤は未登録です。</p>}

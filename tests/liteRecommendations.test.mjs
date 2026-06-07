@@ -114,3 +114,34 @@ test('Pro suggestion uses 30-day habit, coverage, and stability', () => {
   }))
   assert.equal(shouldSuggestProOrIcp(records), true)
 })
+
+test('user-facing advice text never exposes internal identifiers', () => {
+  const scenarios = [
+    buildLiteAdvice({ latestMeasurement: {}, additiveEffects: [] }),
+    buildLiteAdvice({
+      latestMeasurement: { ...normal, kh_dkh: 6.8 },
+      ownedAdditives: [{ additive_id: 'kh-product', is_active: true }],
+      additiveEffects: [effect('kh-product', 'kh', 'increase')],
+    }),
+    buildLiteAdvice({
+      latestMeasurement: { ...normal, po4_ppm: 0.15 },
+      additiveEffects: [effect('another-product', 'po4', 'decrease')],
+      preferredShop: { id: 'shop-1' },
+    }),
+  ]
+  const forbidden = [
+    'additive_effects',
+    'parameter_key',
+    'direction',
+    'increase',
+    'decrease',
+    'consult_shop',
+    'use_owned_additive',
+    'buy_additive',
+    'recommendation_type',
+  ]
+  for (const advice of scenarios.flat()) {
+    const visibleText = `${advice.message || ''} ${advice.actionLabel || ''}`
+    for (const term of forbidden) assert.equal(visibleText.includes(term), false)
+  }
+})
