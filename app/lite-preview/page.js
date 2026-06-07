@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
 import Header from '@/components/Header'
 import { LITE_PARAMETER_LABELS, LITE_TARGETS, judgeAll } from '@/lib/liteTargets'
+import { LITE_MEASUREMENT_STEPS, hasAnyLiteMeasurement } from '@/lib/liteMeasurement'
 
 const SAMPLE_LATEST = {
   measured_at: '2026-06-06T10:30:00+09:00',
@@ -112,9 +113,10 @@ export default function LitePreviewPage() {
             <p className="text-sm font-bold text-cyan-200">レビュー用サンプル</p>
             <p className="mt-1 text-xs text-slate-300">表示データ・写真・操作結果はすべて架空です。</p>
           </div>
-          <div className="grid grid-cols-3 border border-cyan-700">
+          <div className="grid grid-cols-2 border border-cyan-700 sm:grid-cols-4">
             <ModeButton active={mode === 'owner'} onClick={() => setMode('owner')}>ユーザー側</ModeButton>
             <ModeButton active={mode === 'shop'} onClick={() => setMode('shop')}>ショップ側</ModeButton>
+            <ModeButton active={mode === 'measure'} onClick={() => setMode('measure')}>測定入力</ModeButton>
             <ModeButton active={mode === 'analysis'} onClick={() => setMode('analysis')}>分析側</ModeButton>
           </div>
         </div>
@@ -123,6 +125,8 @@ export default function LitePreviewPage() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         {mode === 'owner' ? (
           <OwnerPreview stopped={stopped} setStopped={setStopped} previewUrl={previewUrl} />
+        ) : mode === 'measure' ? (
+          <MeasurePreview />
         ) : mode === 'analysis' ? (
           <AnalysisPreview />
         ) : (
@@ -320,6 +324,89 @@ function Additive({ name, detail }) {
       <p className="font-bold text-white">{name}</p>
       <p className="mt-1 text-sm text-slate-300">{detail}</p>
     </div>
+  )
+}
+
+function MeasurePreview() {
+  const [stepIndex, setStepIndex] = useState(0)
+  const [values, setValues] = useState({})
+  const [done, setDone] = useState(false)
+  const previous = { kh_dkh: 8.0, temperature_c: 25.1, salinity_sg: 1.025, no3_ppm: 14, po4_ppm: 0.09 }
+  const current = LITE_MEASUREMENT_STEPS[stepIndex]
+  const review = stepIndex === LITE_MEASUREMENT_STEPS.length
+
+  if (done) {
+    return (
+      <section className="mx-auto max-w-xl text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400 text-3xl font-bold text-slate-950">✓</div>
+        <h1 className="mt-5 text-3xl font-bold text-white">記録できました</h1>
+        <p className="mt-3 text-slate-300">レビュー用のため、実際のデータは保存されません。</p>
+        <button type="button" onClick={() => { setDone(false); setStepIndex(0); setValues({}) }} className="mt-6 min-h-12 bg-cyan-400 px-5 py-3 font-bold text-slate-950">もう一度試す</button>
+      </section>
+    )
+  }
+
+  return (
+    <section className="mx-auto max-w-xl">
+      <p className="text-sm font-bold text-cyan-300">MEASUREMENT PREVIEW</p>
+      <div className="mt-2 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">リビング SPS Reef</h1>
+        <span className="text-sm font-bold">{Math.min(stepIndex + 1, 6)} / 6</span>
+      </div>
+      <div className="mt-3 grid grid-cols-6 gap-1">
+        {Array.from({ length: 6 }, (_, index) => <div key={index} className={`h-2 ${index <= stepIndex ? 'bg-cyan-400' : 'bg-slate-800'}`} />)}
+      </div>
+
+      {!review ? (
+        <div className="mt-8">
+          <p className="text-center text-sm font-bold text-cyan-300">今回測った値</p>
+          <h2 className="mt-2 text-center text-4xl font-bold text-white">{current.label}</h2>
+          <div className="mt-8 flex items-end gap-3">
+            <input
+              type="number"
+              inputMode="decimal"
+              step={current.step}
+              value={values[current.key] ?? ''}
+              onChange={event => setValues(state => ({ ...state, [current.key]: event.target.value }))}
+              placeholder={current.placeholder}
+              className="min-w-0 flex-1 border-2 border-cyan-700 bg-slate-950 px-4 py-5 text-center text-5xl font-bold text-white"
+            />
+            <span className="pb-5 text-lg font-bold text-slate-300">{current.unit}</span>
+          </div>
+          <div className="mt-5 border border-slate-700 bg-slate-900 p-4">
+            <p className="text-xs text-slate-400">前回の値</p>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <p className="text-2xl font-bold">{previous[current.key]} {current.unit}</p>
+              <button type="button" onClick={() => setValues(state => ({ ...state, [current.key]: String(previous[current.key]) }))} className="min-h-11 border border-cyan-600 px-3 py-2 text-sm font-bold text-cyan-100">前回値をコピー</button>
+            </div>
+          </div>
+          <div className="mt-7 grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => { setValues(state => ({ ...state, [current.key]: '' })); setStepIndex(index => index + 1) }} className="min-h-14 border border-slate-600 px-3 py-3 font-bold">今回は測らない</button>
+            <button type="button" onClick={() => setStepIndex(index => index + 1)} className="min-h-14 bg-cyan-400 px-3 py-3 text-lg font-bold text-slate-950">次へ</button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-8">
+          <h2 className="text-center text-3xl font-bold text-white">この内容で記録します</h2>
+          <div className="mt-6 divide-y divide-slate-800 border border-slate-700 bg-slate-900">
+            {LITE_MEASUREMENT_STEPS.map(step => (
+              <div key={step.key} className="flex items-center justify-between p-4">
+                <strong>{step.label}</strong>
+                <span className={values[step.key] ? 'font-bold text-cyan-200' : 'text-sm text-slate-500'}>
+                  {values[step.key] ? `${values[step.key]} ${step.unit}` : '今回は測らない'}
+                </span>
+              </div>
+            ))}
+          </div>
+          {!hasAnyLiteMeasurement(values) && <p className="mt-4 border border-amber-700 bg-amber-950 p-4 text-sm text-amber-100">保存するには、測れた項目を1つだけ入力してください。</p>}
+          <button type="button" disabled={!hasAnyLiteMeasurement(values)} onClick={() => setDone(true)} className="mt-6 min-h-16 w-full bg-cyan-400 text-xl font-bold text-slate-950 disabled:bg-slate-700 disabled:text-slate-400">記録を保存</button>
+        </div>
+      )}
+
+      {stepIndex > 0 && !done && (
+        <button type="button" onClick={() => setStepIndex(index => index - 1)} className="mt-4 min-h-11 w-full text-sm font-bold text-slate-400 underline">ひとつ前へ戻る</button>
+      )}
+    </section>
   )
 }
 

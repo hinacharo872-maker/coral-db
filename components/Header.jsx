@@ -9,6 +9,9 @@ export default function Header() {
           Aqua Reef Log
         </Link>
         <nav className="flex items-center gap-2">
+          <Link href="/lite" className="min-h-10 border border-cyan-700 px-3 py-2 text-sm font-bold text-cyan-100 hover:border-cyan-300">
+            Lite
+          </Link>
           <Link href="/lite-preview" className="hidden min-h-10 border border-slate-700 px-3 py-2 text-sm font-bold text-slate-200 hover:border-cyan-500 sm:block">
             Liteレビュー
           </Link>

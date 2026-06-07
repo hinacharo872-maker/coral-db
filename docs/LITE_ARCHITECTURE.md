@@ -152,6 +152,14 @@ the admin report can rank missing information quantitatively.
 AI diagnosis, ICP interpretation, consumption-rate calculation, and dose
 calculation remain outside this experiment.
 
+## Lite Measurement Flow
+
+The Lite home links to a one-parameter-per-screen measurement flow for KH,
+temperature, salinity, NO3, and PO4. Each step shows the previous recorded
+value, supports copying it, and uses the neutral phrase "今回は測らない" for
+skipping. A sparse row can be saved when at least one value is present; an
+all-empty measurement is blocked before insertion.
+
 ## Lite Traffic-Light Targets
 
 `lib/liteTargets.js` is the single frontend definition for Lite's simple
