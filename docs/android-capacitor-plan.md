@@ -55,7 +55,7 @@ npm run android:build
 1. Open `android/` in Android Studio.
 2. Use the bundled JDK and installed Android SDK.
 3. Test on API 24 and a current API emulator/device.
-4. Replace generated app icons and splash assets with Coral DB artwork.
+4. Replace generated app icons and splash assets with Coral DB Lite artwork.
 5. Configure Android App Links for Supabase sign-in callbacks.
 6. Create a release signing key outside the repository.
 7. Build an Android App Bundle for Play Console internal testing.

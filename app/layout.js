@@ -2,11 +2,18 @@ import './globals.css'
 import PwaRegister from '@/components/PwaRegister'
 
 export const metadata = {
-  title: 'Coral DB',
-  description: '海水水槽の水質記録と推移グラフ',
+  title: 'Coral DB Lite',
+  description: 'ショップに見せやすい海水水槽カルテと水質記録',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/app-icon.svg', apple: '/app-icon.svg' },
-  appleWebApp: { capable: true, title: 'Coral DB', statusBarStyle: 'black-translucent' },
+  icons: {
+    icon: [
+      { url: '/app-icon.svg', type: 'image/svg+xml' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: '/icons/icon-192.png',
+  },
+  appleWebApp: { capable: true, title: 'Coral DB Lite', statusBarStyle: 'black-translucent' },
 }
 
 export const viewport = {

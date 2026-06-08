@@ -6,7 +6,7 @@ export default function Header() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 text-lg font-bold text-white transition-colors hover:text-cyan-200">
           <span aria-hidden="true" className="text-cyan-300">◆</span>
-          Coral DB
+          Coral DB Lite
         </Link>
         <nav className="flex items-center gap-2">
           <Link href="/lite" className="min-h-10 border border-cyan-700 px-3 py-2 text-sm font-bold text-cyan-100 hover:border-cyan-300">
@@ -14,6 +14,12 @@ export default function Header() {
           </Link>
           <Link href="/lite/shop-card" className="min-h-10 border border-cyan-700 px-3 py-2 text-sm font-bold text-cyan-100 hover:border-cyan-300">
             ショップに見せる
+          </Link>
+          <Link href="/privacy" className="hidden min-h-10 px-2 py-2 text-sm font-bold text-slate-300 hover:text-white sm:inline-block">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hidden min-h-10 px-2 py-2 text-sm font-bold text-slate-300 hover:text-white sm:inline-block">
+            Terms
           </Link>
         </nav>
       </div>

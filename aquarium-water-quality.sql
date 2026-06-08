@@ -1,4 +1,4 @@
--- Aqua Reef Log water quality schema for Supabase.
+-- Coral DB Lite water quality schema for Supabase.
 -- Run this in the Supabase SQL editor after supabase-setup.sql.
 --
 -- MVP policy note:
@@ -62,5 +62,5 @@ CREATE POLICY "public water log delete" ON water_quality_logs
   FOR DELETE USING (true);
 
 INSERT INTO aquariums (name, volume_liters, notes)
-SELECT 'Main Reef Tank', NULL, 'Default aquarium created by Aqua Reef Log setup.'
+SELECT 'Main Reef Tank', NULL, 'Default aquarium created by Coral DB Lite setup.'
 WHERE NOT EXISTS (SELECT 1 FROM aquariums);

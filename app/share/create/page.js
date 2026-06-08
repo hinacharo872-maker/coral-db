@@ -8,7 +8,6 @@ import { supabase } from '@/lib/supabase'
 const EXPIRY_OPTIONS = [
   { value: '24h', label: '24時間' },
   { value: '7d', label: '7日' },
-  { value: 'never', label: '無期限' },
 ]
 
 function createToken() {
@@ -18,7 +17,6 @@ function createToken() {
 }
 
 function expiresAtFor(value) {
-  if (value === 'never') return null
   const hours = value === '24h' ? 24 : 24 * 7
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
 }
@@ -154,7 +152,7 @@ export default function CreateSharePage() {
     try {
       await navigator.share({
         title: `${tankNames.get(link.tank_id) || '水槽'}のショップ用カルテ`,
-        text: 'Coral DBのショップ用水槽カルテです。',
+        text: 'Coral DB Liteのショップ用水槽カルテです。',
         url,
       })
     } catch (error) {
@@ -197,9 +195,9 @@ export default function CreateSharePage() {
   return (
     <PageShell>
       <div>
-        <p className="text-sm font-semibold text-cyan-300">LITE EXPERIMENT</p>
+        <p className="text-sm font-semibold text-cyan-300">Coral DB Lite</p>
         <h1 className="mt-1 text-3xl font-bold text-white">ショップ共有</h1>
-        <p className="mt-2 text-sm text-slate-300">水槽カルテをURLまたはQRコードで店員へ見せられます。</p>
+        <p className="mt-2 text-sm text-slate-300">水槽カルテをURLまたはQRコードで店員へ見せられます。新しく作る共有は24時間または7日で自動的に期限切れになります。</p>
       </div>
 
       {error && <p className="mt-5 border border-rose-700 bg-rose-950 p-3 text-rose-100">{error}</p>}
@@ -263,7 +261,7 @@ export default function CreateSharePage() {
                     <div>
                       <h3 className="font-bold text-white">{tankNames.get(link.tank_id) || '水槽カルテ'}</h3>
                       <p className="mt-1 text-xs text-slate-400">
-                        期限: {link.expires_at ? new Date(link.expires_at).toLocaleString('ja-JP') : '無期限'}
+                        期限: {link.expires_at ? new Date(link.expires_at).toLocaleString('ja-JP') : '期限なし（旧リンク）'}
                       </p>
                     </div>
                     <span className={`shrink-0 px-3 py-1 text-xs font-bold ${status.tone}`}>{status.label}</span>

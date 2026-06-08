@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Coral DB</string>
-    <string name="title_activity_main">Coral DB</string>
+    <string name="app_name">Coral DB Lite</string>
+    <string name="title_activity_main">Coral DB Lite</string>
     <string name="package_name">jp.aquareeflog.app</string>
     <string name="custom_url_scheme">jp.aquareeflog.app</string>
 </resources>
