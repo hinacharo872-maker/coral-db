@@ -1,8 +1,8 @@
-# Coral DB Lite Android / Capacitor Plan
+# ReefChart Lite Android / Capacitor Plan
 
 ## Goal
 
-Coral DB Lite will remain one product across the web and Android, with an
+ReefChart Lite will remain one product across the web and Android, with an
 Android shell built with Capacitor. The Android app must preserve the existing
 Next.js and Supabase web release while gradually adding camera, local
 notifications, durable device storage, offline work, and Play Store delivery.
@@ -55,7 +55,7 @@ npm run android:build
 1. Open `android/` in Android Studio.
 2. Use the bundled JDK and installed Android SDK.
 3. Test on API 24 and a current API emulator/device.
-4. Replace generated app icons and splash assets with Coral DB Lite artwork.
+4. Replace generated app icons and splash assets with ReefChart Lite artwork.
 5. Configure Android App Links for Supabase sign-in callbacks.
 6. Create a release signing key outside the repository.
 7. Build an Android App Bundle for Play Console internal testing.

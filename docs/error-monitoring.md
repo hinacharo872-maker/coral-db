@@ -4,7 +4,7 @@ Last updated: 2026-06-08
 
 ## Goal
 
-Coral DB Lite needs enough error visibility to fix broken flows before release,
+ReefChart Lite needs enough error visibility to fix broken flows before release,
 without sending aquarium photos, water logs, email addresses, share tokens, or
 free-text notes to a monitoring vendor.
 

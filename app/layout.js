@@ -2,8 +2,9 @@ import './globals.css'
 import PwaRegister from '@/components/PwaRegister'
 
 export const metadata = {
-  title: 'Coral DB Lite',
+  title: 'ReefChart Lite',
   description: 'ショップに見せやすい海水水槽カルテと水質記録',
+  applicationName: 'ReefChart Lite',
   manifest: '/manifest.webmanifest',
   icons: {
     icon: [
@@ -13,7 +14,18 @@ export const metadata = {
     ],
     apple: '/icons/icon-192.png',
   },
-  appleWebApp: { capable: true, title: 'Coral DB Lite', statusBarStyle: 'black-translucent' },
+  appleWebApp: { capable: true, title: 'ReefChart Lite', statusBarStyle: 'black-translucent' },
+  openGraph: {
+    title: 'ReefChart Lite',
+    description: 'ショップに見せやすい海水水槽カルテと水質記録',
+    siteName: 'ReefChart Lite',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'ReefChart Lite',
+    description: 'ショップに見せやすい海水水槽カルテと水質記録',
+  },
 }
 
 export const viewport = {

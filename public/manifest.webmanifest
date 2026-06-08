@@ -1,6 +1,6 @@
 {
-  "name": "Coral DB Lite",
-  "short_name": "Coral DB",
+  "name": "ReefChart Lite",
+  "short_name": "ReefChart",
   "description": "ショップに見せやすい海水水槽カルテと水質記録",
   "start_url": "/",
   "scope": "/",

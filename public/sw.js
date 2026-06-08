@@ -1,4 +1,4 @@
-const CACHE_NAME = 'coral-db-lite-shell-v1'
+const CACHE_NAME = 'reefchart-lite-shell-v1'
 const APP_SHELL = ['/', '/offline.html', '/manifest.webmanifest', '/app-icon.svg', '/icons/icon-192.png', '/icons/icon-512.png']
 
 self.addEventListener('install', event => {

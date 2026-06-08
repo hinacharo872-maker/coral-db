@@ -1,8 +1,8 @@
-# Coral DB Lite
+# ReefChart Lite
 
-Coral DB Lite is a marine aquarium management web app for reef keepers who want a clean record they can show to a trusted shop. It helps users record water quality, see what changed since the last measurement, notice risky values, and prepare a readable tank chart.
+ReefChart Lite is a marine aquarium management web app for reef keepers who want a clean record they can show to a trusted shop. It helps users record water quality, see what changed since the last measurement, notice risky values, and prepare a readable tank chart.
 
-The current MVP focuses on water quality management and the in-app shop card. Coral database and advanced analysis features are being prepared separately for Coral DB Pro and are intentionally secondary in this release.
+The current MVP focuses on water quality management and the in-app shop card. Coral database and advanced analysis features are being prepared separately for ReefChart Pro and are intentionally secondary in this release.
 
 ## Main Features
 
@@ -24,7 +24,7 @@ The current MVP focuses on water quality management and the in-app shop card. Co
 - Edit and delete for water logs and event logs
 - CSV export for water logs and event logs
 - Supabase Auth sync from demo/localStorage data after login
-- Web/PWA metadata for Coral DB Lite
+- Web/PWA metadata for ReefChart Lite
 - Privacy policy and terms pages
 - Release security, smoke-test, and monitoring checklists
 
@@ -122,7 +122,7 @@ https://coral-db.vercel.app/
 
 ## Android Development
 
-The Android MVP uses Capacitor 8 and opens the deployed Coral DB Lite web app
+The Android MVP uses Capacitor 8 and opens the deployed ReefChart Lite web app
 inside a native Android project. This keeps the existing Next.js and Supabase
 behavior intact while native features are introduced gradually.
 

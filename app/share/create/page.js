@@ -152,7 +152,7 @@ export default function CreateSharePage() {
     try {
       await navigator.share({
         title: `${tankNames.get(link.tank_id) || '水槽'}のショップ用カルテ`,
-        text: 'Coral DB Liteのショップ用水槽カルテです。',
+        text: 'ReefChart Liteのショップ用水槽カルテです。',
         url,
       })
     } catch (error) {
@@ -195,7 +195,7 @@ export default function CreateSharePage() {
   return (
     <PageShell>
       <div>
-        <p className="text-sm font-semibold text-cyan-300">Coral DB Lite</p>
+        <p className="text-sm font-semibold text-cyan-300">ReefChart Lite</p>
         <h1 className="mt-1 text-3xl font-bold text-white">ショップ共有</h1>
         <p className="mt-2 text-sm text-slate-300">水槽カルテをURLまたはQRコードで店員へ見せられます。新しく作る共有は24時間または7日で自動的に期限切れになります。</p>
       </div>

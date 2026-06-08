@@ -110,7 +110,7 @@ export default function LiteHomePage() {
     return (
       <Shell>
         <section className="mx-auto max-w-md border border-slate-700 bg-slate-900 p-5">
-          <p className="text-sm font-bold text-cyan-300">Coral DB Lite</p>
+          <p className="text-sm font-bold text-cyan-300">ReefChart Lite</p>
           <h1 className="mt-1 text-3xl font-bold text-white">かんたん水質記録</h1>
           <p className="mt-3 leading-relaxed text-slate-300">測れた項目だけで大丈夫です。ショップへ見せやすい水槽カルテを作ります。</p>
           <form onSubmit={sendMagicLink} className="mt-6 space-y-3">
@@ -125,7 +125,7 @@ export default function LiteHomePage() {
 
   return (
     <Shell>
-      <p className="text-sm font-bold text-cyan-300">Coral DB Lite</p>
+      <p className="text-sm font-bold text-cyan-300">ReefChart Lite</p>
       <h1 className="mt-1 text-3xl font-bold text-white">Liteホーム</h1>
       <p className="mt-2 text-slate-300">今日は測れた項目だけ記録しましょう。</p>
 

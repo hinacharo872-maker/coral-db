@@ -1,8 +1,8 @@
 import Header from '@/components/Header'
 
 export const metadata = {
-  title: '利用規約 | Coral DB Lite',
-  description: 'Coral DB Liteの利用規約',
+  title: '利用規約 | ReefChart Lite',
+  description: 'ReefChart Liteの利用規約',
 }
 
 export default function TermsPage() {
@@ -10,16 +10,16 @@ export default function TermsPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <Header />
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <p className="text-sm font-bold text-cyan-300">Coral DB Lite</p>
+        <p className="text-sm font-bold text-cyan-300">ReefChart Lite</p>
         <h1 className="mt-2 text-3xl font-bold text-white">利用規約</h1>
         <p className="mt-3 text-sm text-slate-400">最終更新日: 2026年6月8日</p>
 
         <TermsSection title="サービスの位置づけ">
-          <p>Coral DB Liteは、海水水槽の記録とショップ相談を補助するツールです。診断、医療、獣医療、専門業務、メーカー公式説明の代替ではありません。</p>
+          <p>ReefChart Liteは、海水水槽の記録とショップ相談を補助するツールです。診断、医療、獣医療、専門業務、メーカー公式説明の代替ではありません。</p>
         </TermsSection>
 
         <TermsSection title="添加・購入判断">
-          <p>添加剤の使用や購入、水換え、設備変更は、ショップ、メーカー公式説明、専門家の助言を確認したうえで利用者の判断で行ってください。Coral DB Liteは自己判断で急な添加を促すものではありません。</p>
+          <p>添加剤の使用や購入、水換え、設備変更は、ショップ、メーカー公式説明、専門家の助言を確認したうえで利用者の判断で行ってください。ReefChart Liteは自己判断で急な添加を促すものではありません。</p>
         </TermsSection>
 
         <TermsSection title="データとバックアップ">
@@ -40,7 +40,7 @@ export default function TermsPage() {
         </TermsSection>
 
         <TermsSection title="免責">
-          <p>Coral DB Liteの表示や提案は、水槽の状態や生体の安全を保証するものではありません。利用により生じた損害について、法令で認められる範囲で責任を負いません。</p>
+          <p>ReefChart Liteの表示や提案は、水槽の状態や生体の安全を保証するものではありません。利用により生じた損害について、法令で認められる範囲で責任を負いません。</p>
         </TermsSection>
       </main>
     </div>

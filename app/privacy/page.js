@@ -1,8 +1,8 @@
 import Header from '@/components/Header'
 
 export const metadata = {
-  title: 'プライバシーポリシー | Coral DB Lite',
-  description: 'Coral DB Liteのプライバシーポリシー',
+  title: 'プライバシーポリシー | ReefChart Lite',
+  description: 'ReefChart Liteのプライバシーポリシー',
 }
 
 export default function PrivacyPage() {
@@ -10,12 +10,12 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <Header />
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <p className="text-sm font-bold text-cyan-300">Coral DB Lite</p>
+        <p className="text-sm font-bold text-cyan-300">ReefChart Lite</p>
         <h1 className="mt-2 text-3xl font-bold text-white">プライバシーポリシー</h1>
         <p className="mt-3 text-sm text-slate-400">最終更新日: 2026年6月8日</p>
 
         <PolicySection title="取得する情報">
-          <p>Coral DB Liteは、アカウント情報、メールアドレス、水槽名、水量、水換え頻度、水質ログ、写真、添加剤情報、ショップに見せる画面で必要な情報を保存します。</p>
+          <p>ReefChart Liteは、アカウント情報、メールアドレス、水槽名、水量、水換え頻度、水質ログ、写真、添加剤情報、ショップに見せる画面で必要な情報を保存します。</p>
         </PolicySection>
 
         <PolicySection title="共有リンクと閲覧">

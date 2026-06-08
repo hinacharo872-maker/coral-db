@@ -1,4 +1,4 @@
-# Coral DB Lite Architecture
+# ReefChart Lite Architecture
 
 ## Product Boundary
 
@@ -25,7 +25,7 @@ This boundary protects all three participants:
 
 ## Data Design Rules
 
-1. Existing Coral DB tables remain unchanged.
+1. Existing ReefChart tables remain unchanged.
 2. Lite data is stored in new `lite_*` tables.
 3. User-entered fields are nullable so partial records remain valid.
 4. Identity, ownership, timestamps, and security columns may be required even

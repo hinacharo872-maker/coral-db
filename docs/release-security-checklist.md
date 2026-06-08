@@ -1,4 +1,4 @@
-# Coral DB Lite Release Security Checklist
+# ReefChart Lite Release Security Checklist
 
 Last updated: 2026-06-08
 

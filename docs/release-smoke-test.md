@@ -1,4 +1,4 @@
-# Coral DB Lite Release Smoke Test
+# ReefChart Lite Release Smoke Test
 
 Last updated: 2026-06-08
 

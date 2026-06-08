@@ -1,8 +1,8 @@
-# Coral DB Lite Product Principles
+# ReefChart Lite Product Principles
 
 ## Product boundary
 
-Coral DB Lite and Coral DB Pro are separate products with different
+ReefChart Lite and ReefChart Pro are separate products with different
 users and jobs. Lite is free. Pro is paid.
 
 Lite is for beginners and older users who need a small, forgiving aquarium
