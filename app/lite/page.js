@@ -110,6 +110,19 @@ export default function LiteHomePage() {
   if (!session) {
     return (
       <Shell>
+        <section className="mx-auto mb-4 max-w-md border border-amber-500 bg-amber-950/50 p-5">
+          <p className="text-xs font-bold text-amber-200">ログインなしで確認できます</p>
+          <h1 className="mt-1 text-2xl font-bold text-white">ナガレハナ不調デモ</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-200">
+            水質の変化、添加剤、写真をまとめたショップ相談用カルテです。実データは変更しません。
+          </p>
+          <Link
+            href="/lite/shop-card?demo=nagarehana"
+            className="mt-4 flex min-h-14 items-center justify-center bg-amber-400 px-4 py-3 text-lg font-bold text-slate-950"
+          >
+            ナガレハナ不調デモを開く
+          </Link>
+        </section>
         <section className="mx-auto max-w-md border border-slate-700 bg-slate-900 p-5">
           <p className="text-sm font-bold text-cyan-300">ReefChart Lite β版</p>
           <h1 className="mt-1 text-3xl font-bold text-white">かんたん水質記録</h1>

@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import { supabase } from '@/lib/supabase'
 import { LITE_PARAMETER_LABELS, LITE_TARGETS, findMissingKeys, judgeAll } from '@/lib/liteTargets'
+import { createNagarehanaDemo, NAGAREHANA_DEMO_ID } from '@/lib/liteDemo'
 
 const PARAMETERS = [
   { key: 'kh_dkh', unit: 'dKH' },
@@ -32,6 +33,7 @@ const SEVERITY_LABEL = {
 const FREQUENCY_LABELS = {
   daily: '毎日',
   every_2_days: '2日に1回',
+  three_times_weekly: '週3回',
   weekly: '週1回',
   as_needed: '必要時',
   unknown: '頻度未登録',
@@ -48,6 +50,7 @@ export default function LiteShopCardPage() {
 function LiteShopCard() {
   const searchParams = useSearchParams()
   const requestedTankId = searchParams.get('tank')
+  const demoId = searchParams.get('demo')
   const [record, setRecord] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -56,6 +59,11 @@ function LiteShopCard() {
     async function load() {
       setLoading(true)
       setError('')
+      if (demoId === NAGAREHANA_DEMO_ID) {
+        setRecord(createNagarehanaDemo())
+        setLoading(false)
+        return
+      }
       const { data: authData } = await supabase.auth.getSession()
       if (!authData.session) {
         setError('Liteホームからログインしてください。')
@@ -117,7 +125,7 @@ function LiteShopCard() {
       setLoading(false)
     }
     load()
-  }, [requestedTankId])
+  }, [requestedTankId, demoId])
 
   const checks = useMemo(() => {
     if (!record) return []
@@ -141,6 +149,8 @@ function LiteShopCard() {
       </PageShell>
     )
   }
+
+  if (record.isDemo) return <DemoShopCard record={record} />
 
   const values = Object.fromEntries(PARAMETERS.map(parameter => [
     parameter.key,
@@ -231,6 +241,161 @@ function LiteShopCard() {
         <p className="mt-1">添加や購入の判断は、この画面を見ながらショップと相談してください。</p>
       </section>
     </PageShell>
+  )
+}
+
+function DemoShopCard({ record }) {
+  const values = Object.fromEntries(PARAMETERS.map(parameter => [
+    parameter.key,
+    record.parameterLatest[parameter.key]?.value ?? null,
+  ]))
+  const severities = new Map(judgeAll(values).map(item => [item.parameterKey, item.severity]))
+
+  return (
+    <PageShell>
+      <section className="border border-amber-500 bg-amber-950/50 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold text-amber-200">ショップレビュー用デモ</p>
+            <h1 className="mt-1 text-2xl font-bold text-white">{record.demoName}</h1>
+            <p className="mt-1 text-sm text-slate-200">実データには保存されていません。</p>
+          </div>
+          <Link
+            href="/"
+            className="flex min-h-12 items-center justify-center border border-amber-300 px-4 py-3 font-bold text-amber-100"
+          >
+            デモを終了
+          </Link>
+        </div>
+      </section>
+
+      <section className="mt-4 border-b border-slate-700 pb-4">
+        <p className="text-xs font-bold text-emerald-300">ショップに見せる画面</p>
+        <h2 className="mt-1 text-3xl font-bold text-white">{record.tank.display_name}</h2>
+        <p className="mt-2 leading-6 text-slate-300">{record.tank.note}</p>
+      </section>
+
+      <section className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Fact label="水槽サイズ" value={`${record.tank.tank_volume_liters} L`} />
+        <Fact label="水換え頻度" value="2週間に1回" />
+        <Fact label="1回の換水量" value={`${record.tank.water_change_volume_liters} L`} />
+        <Fact label="最終換水日" value={`8日前（${formatDate(record.tank.last_water_change_at)}）`} />
+      </section>
+
+      <section className="mt-5">
+        <h2 className="text-lg font-bold text-white">現在の水質</h2>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {PARAMETERS.map(parameter => {
+            const latest = record.parameterLatest[parameter.key]
+            const severity = severities.get(parameter.key) || 'unknown'
+            const freshness = getFreshness(latest?.measured_at)
+            return (
+              <article key={parameter.key} className={`min-h-36 border-2 p-3 ${SEVERITY_STYLE[severity]}`}>
+                <strong className="text-sm">{LITE_PARAMETER_LABELS[parameter.key]}</strong>
+                <p className="mt-3 text-3xl font-bold">{formatValue(latest?.value, parameter.key)}</p>
+                <p className="text-xs opacity-80">{parameter.unit}</p>
+                <p className={`mt-3 text-xs font-bold ${freshness.tone}`}>{freshness.label}</p>
+                <p className="mt-1 text-[10px] opacity-70">{formatDate(latest?.measured_at)}</p>
+              </article>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-lg font-bold text-white">直近14日の変化</h2>
+        <p className="mt-1 text-sm text-slate-400">数値の上下を、左から古い順に表示しています。</p>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          {PARAMETERS.map(parameter => (
+            <DemoTrendChart key={parameter.key} parameter={parameter} measurements={record.measurements} />
+          ))}
+        </div>
+      </section>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <section className="border border-slate-700">
+          <h2 className="border-b border-slate-700 bg-slate-900 px-4 py-3 font-bold text-white">使っている添加剤</h2>
+          {record.additives.map(additive => (
+            <div key={`${additive.brand_snapshot}-${additive.product_name_snapshot}`} className="border-b border-slate-800 px-4 py-3 last:border-0">
+              <p className="font-bold text-white">{[additive.brand_snapshot, additive.product_name_snapshot].filter(Boolean).join(' ')}</p>
+              <p className="mt-1 text-sm text-slate-300">
+                {[FREQUENCY_LABELS[additive.frequency], additive.amount_text].filter(Boolean).join(' / ')}
+              </p>
+            </div>
+          ))}
+        </section>
+
+        <section className="border border-amber-600 bg-amber-950/40">
+          <h2 className="border-b border-amber-700 px-4 py-3 font-bold text-white">確認ポイント</h2>
+          <div className="space-y-3 p-4">
+            {record.checks.map(check => (
+              <p key={check} className="border-l-4 border-amber-400 pl-3 text-sm leading-6 text-slate-100">{check}</p>
+            ))}
+            <p className="pt-1 text-xs leading-5 text-slate-400">
+              これは診断ではありません。急な添加や購入を決める前に、測定方法や日々の管理状況をショップと確認してください。
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <section className="mt-6">
+        <h2 className="text-lg font-bold text-white">ナガレハナサンゴの写真</h2>
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          {record.photos.map((photo, index) => (
+            <figure key={photo.photo_url} className="border border-slate-700 bg-slate-900">
+              <img src={photo.photo_url} alt={photo.note} className="aspect-[4/3] w-full object-cover" />
+              <figcaption className="p-3">
+                <p className="text-xs font-bold text-cyan-300">{['元気だった頃', '開きが悪くなった日', '今日の状態'][index]}</p>
+                <p className="mt-1 text-xs text-slate-400">{formatDate(photo.taken_at)}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-200">{photo.note}</p>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6 border border-slate-700 bg-slate-900 p-4 text-sm leading-6 text-slate-300">
+        <strong className="text-white">ショップの方へ</strong>
+        <p className="mt-1">この画面だけで状況を把握できるか、足りない情報や不要な情報があればぜひ教えてください。</p>
+      </section>
+    </PageShell>
+  )
+}
+
+function DemoTrendChart({ parameter, measurements }) {
+  const values = measurements.map(item => Number(item[parameter.key]))
+  const width = 420
+  const height = 150
+  const pad = 24
+  const rawMin = Math.min(...values)
+  const rawMax = Math.max(...values)
+  const margin = Math.max((rawMax - rawMin) * 0.25, parameter.key === 'salinity_sg' ? 0.001 : 0.1)
+  const min = rawMin - margin
+  const max = rawMax + margin
+  const x = index => pad + (index / Math.max(values.length - 1, 1)) * (width - pad * 2)
+  const y = value => pad + ((max - value) / Math.max(max - min, 0.001)) * (height - pad * 2)
+  const path = values.map((value, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(value)}`).join(' ')
+  const first = values[0]
+  const last = values.at(-1)
+  const trend = last > first ? '上昇傾向' : last < first ? '低下傾向' : '大きな変化なし'
+  const trendTone = last === first ? 'text-emerald-300' : 'text-amber-300'
+
+  return (
+    <article className="border border-slate-700 bg-slate-900 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <strong className="text-white">{LITE_PARAMETER_LABELS[parameter.key]}</strong>
+        <span className={`text-sm font-bold ${trendTone}`}>{trend}</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="mt-2 w-full" role="img" aria-label={`${LITE_PARAMETER_LABELS[parameter.key]}の14日間の変化`}>
+        <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#475569" />
+        <path d={path} fill="none" stroke="#22d3ee" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        {values.map((value, index) => <circle key={index} cx={x(index)} cy={y(value)} r="5" fill="#f8fafc" />)}
+      </svg>
+      <div className="flex justify-between text-xs text-slate-400">
+        <span>{formatValue(first, parameter.key)} {parameter.unit}</span>
+        <span>{formatValue(last, parameter.key)} {parameter.unit}</span>
+      </div>
+    </article>
   )
 }
 

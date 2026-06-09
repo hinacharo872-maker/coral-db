@@ -76,6 +76,12 @@ export default function ReefChartLiteHome() {
           >
             Liteをはじめる
           </Link>
+          <Link
+            href="/lite/shop-card?demo=nagarehana"
+            className="mt-3 flex min-h-14 w-full max-w-sm items-center justify-center border-2 border-white/70 bg-slate-950/60 px-5 py-3 text-lg font-bold text-white hover:border-white"
+          >
+            ナガレハナ不調デモを見る
+          </Link>
         </div>
       </section>
 
@@ -114,6 +120,20 @@ export default function ReefChartLiteHome() {
               </Link>
             ))}
           </div>
+        </section>
+
+        <section className="mt-8 border border-amber-500 bg-amber-950/50 p-5">
+          <p className="text-xs font-bold text-amber-200">ショップレビュー用</p>
+          <h2 className="mt-1 text-xl font-bold text-white">実際の相談に近いデモを見る</h2>
+          <p className="mt-2 leading-7 text-slate-200">
+            ナガレハナサンゴの開きが悪くなり、水質と写真を持って相談に来た初心者の水槽を再現しています。
+          </p>
+          <Link
+            href="/lite/shop-card?demo=nagarehana"
+            className="mt-5 flex min-h-14 w-full max-w-sm items-center justify-center bg-amber-400 px-5 py-3 text-lg font-bold text-slate-950"
+          >
+            デモを見る
+          </Link>
         </section>
 
         <section className="mt-8 border border-slate-700 bg-slate-900 p-5">
