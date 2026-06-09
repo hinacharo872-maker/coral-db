@@ -3,7 +3,7 @@
   "appName": "ReefChart Lite",
   "webDir": "public/capacitor-shell",
   "server": {
-    "url": "https://coral-db.vercel.app",
+    "url": "https://reefchart.vercel.app",
     "androidScheme": "https",
     "cleartext": false,
     "errorPath": "offline.html"

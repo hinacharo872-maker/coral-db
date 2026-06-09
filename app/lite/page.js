@@ -6,6 +6,7 @@ import Header from '@/components/Header'
 import { supabase } from '@/lib/supabase'
 import { LITE_MEASUREMENT_STEPS } from '@/lib/liteMeasurement'
 import { LITE_PARAMETER_LABELS, judgeAll } from '@/lib/liteTargets'
+import { browserSiteUrl } from '@/lib/siteUrl'
 
 export default function LiteHomePage() {
   const [session, setSession] = useState(null)
@@ -85,7 +86,7 @@ export default function LiteHomePage() {
     setMessage('')
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/lite` },
+      options: { emailRedirectTo: `${browserSiteUrl()}/lite` },
     })
     setMessage(error ? 'ログインメールを送れませんでした。もう一度お試しください。' : 'ログインリンクをメールへ送りました。')
   }
@@ -110,9 +111,10 @@ export default function LiteHomePage() {
     return (
       <Shell>
         <section className="mx-auto max-w-md border border-slate-700 bg-slate-900 p-5">
-          <p className="text-sm font-bold text-cyan-300">ReefChart Lite</p>
+          <p className="text-sm font-bold text-cyan-300">ReefChart Lite β版</p>
           <h1 className="mt-1 text-3xl font-bold text-white">かんたん水質記録</h1>
           <p className="mt-3 leading-relaxed text-slate-300">測れた項目だけで大丈夫です。ショップへ見せやすい水槽カルテを作ります。</p>
+          <p className="mt-2 text-sm text-amber-100">現在はβ版です。大切な記録はCSVでのバックアップをおすすめします。</p>
           <form onSubmit={sendMagicLink} className="mt-6 space-y-3">
             <input type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="メールアドレス" className="w-full border border-slate-600 bg-slate-950 px-4 py-4 text-lg text-white" />
             <button className="min-h-14 w-full bg-cyan-400 px-4 py-3 text-lg font-bold text-slate-950">ログインリンクを送る</button>
@@ -125,9 +127,10 @@ export default function LiteHomePage() {
 
   return (
     <Shell>
-      <p className="text-sm font-bold text-cyan-300">ReefChart Lite</p>
+      <p className="text-sm font-bold text-cyan-300">ReefChart Lite β版</p>
       <h1 className="mt-1 text-3xl font-bold text-white">Liteホーム</h1>
       <p className="mt-2 text-slate-300">今日は測れた項目だけ記録しましょう。</p>
+      <p className="mt-2 text-sm text-slate-400">現在はβ版です。大切な記録はCSVでのバックアップをおすすめします。</p>
 
       {error && <p className="mt-5 border border-rose-700 bg-rose-950 p-4 text-rose-100">{error}</p>}
 

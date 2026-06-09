@@ -101,7 +101,7 @@ export default function LitePreviewPage() {
     () => new Map(judgeAll(SAMPLE_LATEST).map(item => [item.parameterKey, item.severity])),
     [],
   )
-  const previewUrl = 'https://coral-db.vercel.app/lite-preview'
+  const previewUrl = 'https://reefchart.vercel.app/lite-preview'
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">

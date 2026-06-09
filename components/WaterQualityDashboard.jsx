@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { browserSiteUrl } from '@/lib/siteUrl'
 
 const TEXT = {
   ja: {
@@ -1100,7 +1101,7 @@ export default function WaterQualityDashboard({ locale = 'ja' }) {
 
   async function sendMagicLink(event) {
     event.preventDefault()
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } })
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: browserSiteUrl() } })
     setAuthMessage(error ? error.message : text.loginSent)
   }
 

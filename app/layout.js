@@ -1,10 +1,17 @@
 import './globals.css'
 import PwaRegister from '@/components/PwaRegister'
+import Footer from '@/components/Footer'
+import { configuredSiteUrl } from '@/lib/siteUrl'
+
+const siteUrl = configuredSiteUrl()
+const socialDescription = '海水水槽の水質・水換え・添加剤・写真をかんたんに記録し、ショップに見せやすくする無料ログアプリ。'
 
 export const metadata = {
+  metadataBase: new URL(siteUrl),
   title: 'ReefChart Lite',
-  description: 'ショップに見せやすい海水水槽カルテと水質記録',
+  description: socialDescription,
   applicationName: 'ReefChart Lite',
+  alternates: { canonical: '/' },
   manifest: '/manifest.webmanifest',
   icons: {
     icon: [
@@ -17,14 +24,22 @@ export const metadata = {
   appleWebApp: { capable: true, title: 'ReefChart Lite', statusBarStyle: 'black-translucent' },
   openGraph: {
     title: 'ReefChart Lite',
-    description: 'ショップに見せやすい海水水槽カルテと水質記録',
+    description: socialDescription,
     siteName: 'ReefChart Lite',
+    url: siteUrl,
     type: 'website',
+    images: [{
+      url: '/og/reefchart-lite-beta.png',
+      width: 1200,
+      height: 630,
+      alt: 'ReefChart Lite β版',
+    }],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'ReefChart Lite',
-    description: 'ショップに見せやすい海水水槽カルテと水質記録',
+    description: socialDescription,
+    images: ['/og/reefchart-lite-beta.png'],
   },
 }
 
@@ -41,6 +56,7 @@ export default function RootLayout({ children }) {
       <body className="bg-slate-950 min-h-screen">
         <PwaRegister />
         {children}
+        <Footer />
       </body>
     </html>
   )

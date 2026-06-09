@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { browserSiteUrl } from '@/lib/siteUrl'
 
 export default function CoralIdentityDashboard() {
   const [summary, setSummary] = useState(null)
@@ -78,7 +79,7 @@ export default function CoralIdentityDashboard() {
     setAuthMessage('')
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: browserSiteUrl() },
     })
     setAuthMessage(error ? error.message : 'ログインリンクをメールへ送りました。')
   }

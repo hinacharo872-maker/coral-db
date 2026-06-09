@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import Header from '@/components/Header'
 import { supabase } from '@/lib/supabase'
+import { browserSiteUrl } from '@/lib/siteUrl'
 
 const EXPIRY_OPTIONS = [
   { value: '24h', label: '24時間' },
@@ -99,7 +100,7 @@ export default function CreateSharePage() {
     setAuthMessage('')
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/share/create` },
+      options: { emailRedirectTo: `${browserSiteUrl()}/share/create` },
     })
     setAuthMessage(error ? 'ログインメールを送信できませんでした。' : 'ログインリンクをメールへ送りました。')
   }
@@ -133,7 +134,7 @@ export default function CreateSharePage() {
   }
 
   async function copyUrl(link) {
-    const url = `${window.location.origin}/share/${link.token}`
+    const url = `${browserSiteUrl()}/share/${link.token}`
     try {
       await navigator.clipboard.writeText(url)
       setCopiedId(link.id)
@@ -144,7 +145,7 @@ export default function CreateSharePage() {
   }
 
   async function shareUrl(link) {
-    const url = `${window.location.origin}/share/${link.token}`
+    const url = `${browserSiteUrl()}/share/${link.token}`
     if (!navigator.share) {
       await copyUrl(link)
       return
@@ -253,7 +254,7 @@ export default function CreateSharePage() {
           <div className="mt-3 grid gap-4 lg:grid-cols-2">
             {links.map(link => {
               const status = displayStatus(link)
-              const url = `${window.location.origin}/share/${link.token}`
+              const url = `${browserSiteUrl()}/share/${link.token}`
               const active = status.label === '有効'
               return (
                 <article key={link.id} className="border border-slate-700 bg-slate-900 p-4">

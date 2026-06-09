@@ -74,6 +74,7 @@ Create `.env.local` from `.env.local.example`.
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
+NEXT_PUBLIC_SITE_URL=https://reefchart.vercel.app
 ```
 
 For Vercel production, set the same variables in the Vercel project settings.
@@ -117,7 +118,7 @@ The intended production flow is:
 Production URL:
 
 ```text
-https://coral-db.vercel.app/
+https://reefchart.vercel.app/
 ```
 
 ## Android Development
@@ -156,7 +157,7 @@ The debug APK is generated at:
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The current MVP loads `https://coral-db.vercel.app` and therefore requires an
+The current MVP loads `https://reefchart.vercel.app` and therefore requires an
 internet connection. Before a Google Play production release, move the
 production web assets into the app package and complete native deep-link,
 notification, icon, splash screen, signing, and offline-storage work.

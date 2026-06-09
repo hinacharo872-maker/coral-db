@@ -21,9 +21,9 @@ const PAGE_TEXT = {
   ja: {
     tabs: { water: '水質管理', coral: 'サンゴDB', identity: 'DB整理', cleanup: '追加整理', quality: 'DB品質' },
     language: '言語',
-    heroKicker: 'Marine aquarium manager',
+    heroKicker: 'ReefChart Lite β版',
     heroTitle: 'ReefChart Lite',
-    heroBody: '海水水槽の水質測定と、ショップに見せやすい水槽カルテをまとめて管理します。サンゴDBはReefChart Proへ向けて整備中です。',
+    heroBody: '海水水槽の状態を、ショップに見せやすくする無料ログアプリです。現在はβ版のため、記録は定期的なバックアップをおすすめします。',
     summaryWater: '水質ログ',
     summaryWaterValue: '8項目',
     summaryCoral: 'サンゴDB',
