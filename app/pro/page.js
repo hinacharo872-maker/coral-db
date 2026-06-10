@@ -6,7 +6,7 @@ import ProHeader from '@/components/ProHeader'
 import ProChart from '@/components/ProChart'
 import { supabase } from '@/lib/supabase'
 import { browserSiteUrl } from '@/lib/siteUrl'
-import { analyzeParameter, describeEventTrend } from '@/lib/proAnalytics'
+import { analyzeParameter, buildConsumptionSummary, describeEventTrend } from '@/lib/proAnalytics'
 import { PRO_CORE_PARAMETERS, PRO_PARAMETER_BY_KEY, PRO_PARAMETERS, PRO_EVENT_LABELS } from '@/lib/proParameters'
 import { createProDemo } from '@/lib/proDemo'
 
@@ -246,12 +246,7 @@ export default function ProHomePage() {
 function ConsumptionCard({ parameter, analysis, target }) {
   const decimals = parameter.key === 'kh_dkh' ? 2 : 1
   const consumption = analysis.dailyConsumption
-  const trendText = {
-    consuming: `1日あたり ${consumption.toFixed(decimals)} ${parameter.unit} 減少`,
-    stable: 'この期間はおおむね安定',
-    increasing: '上昇傾向。添加・水換え・測定条件を確認',
-    insufficient_data: '計算には2回以上の測定が必要',
-  }[analysis.trend]
+  const trendText = buildConsumptionSummary(analysis.trend, consumption, decimals, parameter.unit)
   const predictedLowDays = analysis.predicted7d != null && analysis.predicted7d < target.min
     ? 7
     : analysis.predicted14d != null && analysis.predicted14d < target.min

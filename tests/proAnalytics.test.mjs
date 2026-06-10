@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   analyzeParameter,
+  buildConsumptionSummary,
   calculateDailyConsumption,
   calculateSlope,
   classifyTrend,
@@ -73,4 +74,15 @@ test('event trend wording reports association without claiming causation', () =>
   assert.match(text, /開始後/)
   assert.match(text, /低下傾向/)
   assert.doesNotMatch(text, /効きました|原因/)
+})
+
+test('consumption summary handles an empty Pro tank without throwing', () => {
+  assert.equal(
+    buildConsumptionSummary('insufficient_data', null, 2, 'dKH'),
+    '計算には2回以上の測定が必要',
+  )
+  assert.equal(
+    buildConsumptionSummary('consuming', 0.1, 2, 'dKH'),
+    '1日あたり 0.10 dKH 減少',
+  )
 })
