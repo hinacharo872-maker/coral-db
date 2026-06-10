@@ -1,10 +1,16 @@
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 export default function Footer() {
+  const pathname = usePathname()
+  const productName = pathname.startsWith('/pro') ? 'ReefChart Pro' : 'ReefChart Lite β版'
+
   return (
     <footer className="border-t border-slate-800 bg-slate-950 px-4 py-6 text-slate-400">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-        <p>ReefChart Lite β版</p>
+        <p>{productName}</p>
         <nav className="flex gap-5">
           <Link href="/privacy" className="min-h-11 py-3 hover:text-white">プライバシーポリシー</Link>
           <Link href="/terms" className="min-h-11 py-3 hover:text-white">利用規約</Link>

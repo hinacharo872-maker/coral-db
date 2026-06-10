@@ -12,8 +12,11 @@ export default function Header() {
           <Link href="/lite" className="min-h-10 border border-cyan-700 px-3 py-2 text-sm font-bold text-cyan-100 hover:border-cyan-300">
             Lite
           </Link>
-          <Link href="/lite/shop-card" className="min-h-10 border border-cyan-700 px-3 py-2 text-sm font-bold text-cyan-100 hover:border-cyan-300">
+          <Link href="/lite/shop-card" className="hidden min-h-10 border border-cyan-700 px-3 py-2 text-sm font-bold text-cyan-100 hover:border-cyan-300 sm:inline-flex sm:items-center">
             ショップに見せる
+          </Link>
+          <Link href="/pro" className="min-h-10 border border-emerald-700 px-3 py-2 text-sm font-bold text-emerald-200 hover:border-emerald-300">
+            Pro
           </Link>
           <Link href="/privacy" className="hidden min-h-10 px-2 py-2 text-sm font-bold text-slate-300 hover:text-white sm:inline-block">
             Privacy
