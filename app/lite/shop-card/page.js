@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
+import LiteEnvironmentSummary from '@/components/LiteEnvironmentSummary'
 import { supabase } from '@/lib/supabase'
 import { LITE_PARAMETER_LABELS, LITE_TARGETS, findMissingKeys, judgeAll } from '@/lib/liteTargets'
 import { createNagarehanaDemo, NAGAREHANA_DEMO_ID } from '@/lib/liteDemo'
@@ -73,7 +74,7 @@ function LiteShopCard() {
 
       let tankQuery = supabase
         .from('lite_tank_profiles')
-        .select('id, display_name, tank_volume_liters, water_change_frequency_days, water_change_volume_liters, last_water_change_at, photo_url')
+        .select('id, display_name, tank_volume_liters, water_change_frequency_days, water_change_volume_liters, last_water_change_at, photo_url, ph, salt_mix_name, lighting_equipment, wave_pumps, filtration_method')
       tankQuery = requestedTankId ? tankQuery.eq('id', requestedTankId) : tankQuery.order('created_at').limit(1)
       const tankResult = await tankQuery.maybeSingle()
       if (tankResult.error || !tankResult.data) {
@@ -186,6 +187,8 @@ function LiteShopCard() {
         </div>
       </section>
 
+      <LiteEnvironmentSummary tank={record.tank} />
+
       <section className="mt-4">
         <h2 className="text-sm font-bold text-white">現在の水質</h2>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -281,6 +284,8 @@ function DemoShopCard({ record }) {
         <Fact label="1回の換水量" value={`${record.tank.water_change_volume_liters} L`} />
         <Fact label="最終換水日" value={`8日前（${formatDate(record.tank.last_water_change_at)}）`} />
       </section>
+
+      <LiteEnvironmentSummary tank={record.tank} />
 
       <section className="mt-5">
         <h2 className="text-lg font-bold text-white">現在の水質</h2>

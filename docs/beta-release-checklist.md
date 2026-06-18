@@ -45,7 +45,10 @@ Target URL: https://reefchart.vercel.app
 - [ ] A water change can be recorded.
 - [ ] An additive can be registered.
 - [ ] A photo can be added.
+- [ ] Optional pH, salt mix, lighting, wave pumps, and filtration can be saved.
+- [ ] Leaving all optional environment fields empty does not block Lite usage.
 - [ ] The `ショップに見せる` screen is readable on a phone.
+- [ ] Only entered environment fields appear on the shop card.
 - [ ] A 24-hour or 7-day share link can be created.
 - [ ] The share opens in a separate logged-out browser.
 - [ ] A stopped share no longer reveals tank data.

@@ -172,6 +172,7 @@ function TankHomeCard({ tank, latest }) {
     { href: `/lite/record?type=water-change&tank=${tank.id}`, label: '水換えを記録' },
     { href: `/lite/record?type=additive&tank=${tank.id}`, label: '添加剤を記録' },
     { href: `/lite/record?type=photo&tank=${tank.id}`, label: '写真を追加' },
+    { href: `/lite/profile?tank=${tank.id}`, label: '飼育環境を登録' },
     { href: `/lite/shop-card?tank=${tank.id}`, label: 'ショップに見せる', shop: true },
   ]
   const judged = judgeAll(latest)

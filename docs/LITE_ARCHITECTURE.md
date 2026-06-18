@@ -58,7 +58,9 @@ ownership boundaries are:
 ### `lite_tank_profiles`
 
 One simple Lite profile per aquarium. Holds the minimum tank context a shop
-needs, such as volume, stage, livestock direction, setup date, and notes.
+needs. Optional pH, salt mix, lighting, wave pumps, and filtration are stored
+here as shop-facing context. They do not join the five-parameter measurement
+flow and remain nullable.
 
 ### `lite_measurements`
 
@@ -252,11 +254,14 @@ Implemented:
 - Append-oriented `lite_advice_events` with structured reasons
 - Automatic `updated_at` maintenance
 - Lite product and data architecture document
+- Optional shop-facing environment profile and owner-only update UI
+- Conditional environment summary in the in-app and shared shop records
 
-Waiting for the remaining table and field specification:
+Remaining release work:
 
-- Remaining table DDL
-- RLS policies for the remaining Lite tables
-- Share RPC
-- Shop record query
-- Lite UI and API integration
+- Apply and verify pending migrations in the target Supabase project
+- Run the authenticated owner flow and anonymous shared-record flow against
+  the deployed schema
+- Complete the manual security and mobile smoke-test checklists
+- Continue the staged Android offline-storage work without changing Lite's
+  product boundary

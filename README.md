@@ -8,8 +8,8 @@ The current MVP focuses on water quality management and the in-app shop card. Co
 
 - Demo mode that works without login
 - Sample water logs and event logs on first visit
-- Water quality logging for temperature, salinity, pH, KH, Ca, Mg, NO3, and PO4
-- Custom water parameters through Supabase `water_parameters` and JSONB `custom_values`
+- Sparse water quality logging for KH, temperature, salinity, NO3, and PO4
+- Optional shop context for pH, salt mix, lighting, wave pumps, and filtration
 - Mobile-friendly numeric input with large plus/minus buttons
 - Previous-value copy for quick daily entry
 - Partial logging, such as recording only KH today
@@ -185,6 +185,7 @@ sharing links. A user can hand their phone to a shop employee and show:
 - Tank volume and water-change routine
 - Latest water-change date
 - KH, temperature, salinity, NO3, and PO4 with color zones
+- Optional pH, salt mix, lighting, wave pumps, and filtration when entered
 - Measurement date and freshness for every parameter
 - Active additives with amount and frequency
 - Latest tank photo

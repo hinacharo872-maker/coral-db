@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Header from '@/components/Header'
+import LiteEnvironmentSummary from '@/components/LiteEnvironmentSummary'
 import { supabase } from '@/lib/supabase'
 import {
   LITE_PARAMETER_LABELS,
@@ -110,12 +111,19 @@ export default function SharedShopRecordPage() {
   useEffect(() => {
     async function loadRecord() {
       setLoading(true)
-      const { data, error } = await supabase.rpc('get_lite_shared_record', {
-        p_token: token,
-        p_visitor_key: getVisitorKey(),
-      })
+      const [recordResult, environmentResult] = await Promise.all([
+        supabase.rpc('get_lite_shared_record', {
+          p_token: token,
+          p_visitor_key: getVisitorKey(),
+        }),
+        supabase.rpc('get_lite_shared_environment', { p_token: token }),
+      ])
+      const { data, error } = recordResult
       if (error) setError('水槽カルテを読み込めませんでした。')
-      else setRecord(data)
+      else setRecord({
+        ...data,
+        tank: { ...(data?.tank || {}), ...(environmentResult.data || {}) },
+      })
       setLoading(false)
     }
     if (token) loadRecord()
@@ -192,6 +200,8 @@ export default function SharedShopRecordPage() {
             : <div className="flex h-full items-center justify-center text-sm text-slate-500">写真未登録</div>}
         </div>
       </section>
+
+      <LiteEnvironmentSummary tank={record.tank} />
 
       <section className="mt-6">
         <h2 className="text-lg font-bold text-white">現在値</h2>

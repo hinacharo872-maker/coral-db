@@ -36,6 +36,11 @@ Lite stores only:
 - Active additives, rough amount, frequency, and a note
 - Dated aquarium photos and a note
 
+For shop consultation, a tank profile may also store optional pH, salt mix,
+lighting, wave pumps, and filtration. These are supporting context, not Lite's
+core measurement set. They must never be required, and an omitted value must
+not produce a wall of "未入力" labels on the shop card.
+
 Measurement values are nullable. Partial records are valid. User-facing copy
 must say "今回は測らない" instead of blaming the user for missing data.
 
@@ -53,6 +58,7 @@ The shop card is Lite's most important screen. It shows:
 - Five water-quality values
 - Unit, measurement date, age, color zone, and target range for every value
 - Active additives with amount and frequency
+- Optional tank environment facts, shown only when entered
 - A short list of items for the shop to check
 
 Freshness:

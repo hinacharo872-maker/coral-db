@@ -21,9 +21,13 @@ users or shops.
 - Record a water change.
 - Register an additive currently in use.
 - Add a tank photo.
+- Leave every optional environment field empty and confirm Lite remains usable.
+- Enter one or more of pH, salt mix, lighting, wave pumps, and filtration.
 - Open the in-app `ショップに見せる` screen.
 - Confirm KH, water temperature, salinity, NO3, PO4, freshness, water change
   routine, additives, and photo are readable on a phone.
+- Confirm entered environment facts are shown and omitted facts do not appear
+  as repeated "未入力" rows.
 
 ## Share Link
 
