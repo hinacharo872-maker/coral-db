@@ -1,4 +1,5 @@
-import { formatEquipment, hasLiteEnvironment, normalizeEquipment } from '@/lib/liteEnvironment'
+import LiteTankEnvironmentDiagram from '@/components/LiteTankEnvironmentDiagram'
+import { formatEquipment, formatPh, hasLiteEnvironment, normalizeEquipment } from '@/lib/liteEnvironment'
 
 export default function LiteEnvironmentSummary({ tank }) {
   if (!hasLiteEnvironment(tank)) return null
@@ -14,12 +15,17 @@ export default function LiteEnvironmentSummary({ tank }) {
       label: 'ウェーブポンプ',
       value: normalizeEquipment(tank.wave_pumps).map(formatEquipment).join(' / '),
     },
-    tank.ph != null && { label: 'pH', value: Number(tank.ph).toFixed(2).replace(/0$/, '') },
+    formatPh(tank.ph) && { label: 'pH', value: formatPh(tank.ph) },
   ].filter(Boolean)
 
   return (
-    <section className="mt-4 border-y border-slate-700 py-4">
-      <h2 className="text-sm font-bold text-white">飼育環境</h2>
+    <section className="mt-5 border-y border-slate-700 py-5">
+      <h2 className="text-xl font-bold text-white">飼育環境</h2>
+      <p className="mt-1 text-sm text-slate-400">水槽図をタップすると、機材や水槽の情報を確認できます。</p>
+      <div className="mt-4">
+        <LiteTankEnvironmentDiagram tank={tank} />
+      </div>
+      <h3 className="mt-5 text-base font-bold text-white">登録内容</h3>
       <dl className="mt-2 grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
         {facts.map(fact => (
           <div key={fact.label} className="min-w-0">

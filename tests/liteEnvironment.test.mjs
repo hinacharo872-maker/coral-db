@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  buildLiteEnvironmentParts,
   formatEquipment,
+  formatPh,
   hasLiteEnvironment,
   normalizeEquipment,
 } from '../lib/liteEnvironment.js'
@@ -15,6 +17,7 @@ test('optional environment stays absent when every field is empty', () => {
     wave_pumps: [],
     filtration_method: '',
   }), false)
+  assert.equal(hasLiteEnvironment({ tank_volume_liters: 120 }), false)
 })
 
 test('each optional environment field can make the summary visible', () => {
@@ -41,4 +44,47 @@ test('equipment display only appends a multiplier for multiple units', () => {
   assert.equal(formatEquipment({ name: 'MP40', quantity: 2 }), 'MP40 ×2')
   assert.equal(formatEquipment({ name: 'AI Prime', quantity: 1 }), 'AI Prime')
   assert.equal(formatEquipment({}), '')
+})
+
+test('pH display removes unnecessary trailing zeros', () => {
+  assert.equal(formatPh(8.2), '8.2')
+  assert.equal(formatPh('8.25'), '8.25')
+  assert.equal(formatPh(null), '')
+  assert.equal(formatPh('not-a-number'), '')
+})
+
+test('diagram parts contain only entered environment details', () => {
+  const parts = buildLiteEnvironmentParts({
+    tank_volume_liters: 120,
+    lighting_equipment: [{ name: 'Spectra SP200', quantity: 2 }],
+    wave_pumps: [{ name: 'MP40', quantity: 2 }],
+    filtration_method: 'オーバーフロー',
+    salt_mix_name: 'Red Sea Blue Bucket',
+    ph: 8.2,
+  })
+
+  assert.deepEqual(parts.map(part => part.key), [
+    'tank',
+    'lighting',
+    'wave',
+    'filtration',
+    'salt',
+    'ph',
+  ])
+  assert.deepEqual(parts[0].details, ['水量：120 L', '濾過方式：オーバーフロー'])
+  assert.equal(parts[1].value, 'Spectra SP200 ×2')
+  assert.equal(parts[2].value, 'MP40 ×2')
+  assert.equal(parts.at(-1).value, '8.2')
+})
+
+test('diagram parts omit missing optional equipment', () => {
+  assert.deepEqual(buildLiteEnvironmentParts({}), [])
+  assert.deepEqual(
+    buildLiteEnvironmentParts({ tank_volume_liters: 90, ph: 8.1 }).map(part => part.key),
+    ['tank', 'ph'],
+  )
+  assert.deepEqual(
+    buildLiteEnvironmentParts({ salt_mix_name: 'Reef Salt' }).map(part => part.key),
+    ['salt'],
+  )
 })

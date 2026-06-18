@@ -4,9 +4,11 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
+import LiteTankEnvironmentDiagram from '@/components/LiteTankEnvironmentDiagram'
 import { supabase } from '@/lib/supabase'
 import {
   FILTRATION_OPTIONS,
+  hasLiteEnvironment,
   LIGHTING_OPTIONS,
   normalizeEquipment,
   SALT_MIX_OPTIONS,
@@ -53,7 +55,7 @@ function LiteEnvironmentForm() {
 
       let query = supabase
         .from('lite_tank_profiles')
-        .select('id, display_name, ph, salt_mix_name, lighting_equipment, wave_pumps, filtration_method')
+        .select('id, display_name, tank_volume_liters, ph, salt_mix_name, lighting_equipment, wave_pumps, filtration_method')
       query = requestedTankId ? query.eq('id', requestedTankId) : query.order('created_at').limit(1)
       const result = await query.maybeSingle()
       if (result.error || !result.data) {
@@ -101,7 +103,10 @@ function LiteEnvironmentForm() {
       .eq('id', tank.id)
       .eq('user_id', session.user.id)
     if (saveError) setError('飼育環境を保存できませんでした。もう一度お試しください。')
-    else setSaved(true)
+    else {
+      setTank(current => ({ ...current, ...payload }))
+      setSaved(true)
+    }
     setSaving(false)
   }
 
@@ -127,12 +132,28 @@ function LiteEnvironmentForm() {
       </Shell>
     )
   }
+
+  const previewPh = form.ph === '' || !Number.isFinite(Number(form.ph)) ? null : Number(form.ph)
+  const previewTank = {
+    ...tank,
+    ph: previewPh,
+    salt_mix_name: selectedText(form.saltMix, form.saltMixOther),
+    filtration_method: selectedText(form.filtration, form.filtrationOther),
+    lighting_equipment: normalizeEquipment(form.lights),
+    wave_pumps: normalizeEquipment(form.wavePumps),
+  }
+
   if (saved) {
     return (
       <Shell>
-        <section className="mx-auto max-w-xl border border-emerald-700 bg-emerald-950/40 p-6 text-center">
+        <section className="mx-auto max-w-3xl border border-emerald-700 bg-emerald-950/40 p-4 text-center sm:p-6">
           <h1 className="text-2xl font-bold text-white">飼育環境を保存しました</h1>
           <p className="mt-2 text-slate-300">入力した情報だけがショップカルテに表示されます。</p>
+          {hasLiteEnvironment(tank) && (
+            <div className="mt-5 text-left">
+              <LiteTankEnvironmentDiagram tank={tank} />
+            </div>
+          )}
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <Link href={`/lite/shop-card?tank=${tank.id}`} className="flex min-h-14 items-center justify-center bg-emerald-400 px-5 font-bold text-slate-950">ショップカルテを見る</Link>
             <button type="button" onClick={() => setSaved(false)} className="min-h-14 border border-slate-600 px-5 font-bold text-white">内容を編集</button>
@@ -148,6 +169,19 @@ function LiteEnvironmentForm() {
         <p className="text-sm font-bold text-cyan-300">{tank.display_name || 'わたしの水槽'}</p>
         <h1 className="mt-1 text-3xl font-bold text-white">飼育環境</h1>
         <p className="mt-3 leading-7 text-slate-300">分かる項目だけで大丈夫です。すべて空欄でも保存できます。</p>
+
+        <section className="mt-6 border border-slate-700 bg-slate-900 p-3 sm:p-5">
+          <h2 className="text-xl font-bold text-white">水槽図プレビュー</h2>
+          {hasLiteEnvironment(previewTank) ? (
+            <div className="mt-3">
+              <LiteTankEnvironmentDiagram tank={previewTank} />
+            </div>
+          ) : (
+            <p className="mt-3 border border-dashed border-slate-600 p-5 text-base leading-7 text-slate-300">
+              下の項目を入力すると、ショップに見せる水槽図がここに表示されます。
+            </p>
+          )}
+        </section>
 
         <form onSubmit={save} className="mt-6 space-y-6">
           <section className="border border-slate-700 bg-slate-900 p-4 sm:p-5">
