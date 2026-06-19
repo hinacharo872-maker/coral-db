@@ -107,7 +107,7 @@ export default function LiteHomePage() {
     setCreating(false)
   }
 
-  if (!authChecked || loading) return <Shell><p className="text-slate-300">Liteを準備しています...</p></Shell>
+  if (!authChecked || loading) return <Shell><LiteLoading /></Shell>
 
   if (!session) {
     return (
@@ -246,6 +246,19 @@ function TankHomeCard({ tank, latest }) {
         ))}
       </div>
     </article>
+  )
+}
+
+function LiteLoading() {
+  return (
+    <section role="status" aria-live="polite" className="mx-auto max-w-md py-12 text-center">
+      <span
+        aria-hidden="true"
+        className="mx-auto block h-12 w-12 animate-spin rounded-full border-4 border-cyan-900 border-t-cyan-300"
+      />
+      <p className="mt-6 text-2xl font-bold text-white">ReefChart Liteを開いています</p>
+      <p className="mt-2 text-lg text-slate-300">少しお待ちください</p>
+    </section>
   )
 }
 
