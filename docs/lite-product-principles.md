@@ -30,7 +30,7 @@ requirements.
 
 Lite stores only:
 
-- Tank volume, routine water-change frequency, routine change volume, latest
+- Optional tank width, depth, height, tank volume, routine water-change frequency, routine change volume, latest
   water-change date, and a note
 - KH, temperature, salinity/specific gravity, NO3, and PO4
 - Active additives, rough amount, frequency, and a note

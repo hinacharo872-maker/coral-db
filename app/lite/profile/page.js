@@ -35,6 +35,10 @@ function LiteEnvironmentForm() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
+    tankWidth: '',
+    tankDepth: '',
+    tankHeight: '',
+    tankVolume: '',
     ph: '',
     saltMix: '',
     saltMixOther: '',
@@ -55,7 +59,7 @@ function LiteEnvironmentForm() {
 
       let query = supabase
         .from('lite_tank_profiles')
-        .select('id, display_name, tank_volume_liters, ph, salt_mix_name, lighting_equipment, wave_pumps, filtration_method')
+        .select('id, display_name, tank_width_cm, tank_depth_cm, tank_height_cm, tank_volume_liters, ph, salt_mix_name, lighting_equipment, wave_pumps, filtration_method')
       query = requestedTankId ? query.eq('id', requestedTankId) : query.order('created_at').limit(1)
       const result = await query.maybeSingle()
       if (result.error || !result.data) {
@@ -64,6 +68,10 @@ function LiteEnvironmentForm() {
         const data = result.data
         setTank(data)
         setForm({
+          tankWidth: data.tank_width_cm ?? '',
+          tankDepth: data.tank_depth_cm ?? '',
+          tankHeight: data.tank_height_cm ?? '',
+          tankVolume: data.tank_volume_liters ?? '',
           ph: data.ph ?? '',
           saltMix: SALT_MIX_OPTIONS.includes(data.salt_mix_name) ? data.salt_mix_name : data.salt_mix_name ? OTHER : '',
           saltMixOther: SALT_MIX_OPTIONS.includes(data.salt_mix_name) ? '' : data.salt_mix_name || '',
@@ -90,7 +98,21 @@ function LiteEnvironmentForm() {
       return
     }
 
+    const tankWidth = optionalPositiveNumber(form.tankWidth)
+    const tankDepth = optionalPositiveNumber(form.tankDepth)
+    const tankHeight = optionalPositiveNumber(form.tankHeight)
+    const tankVolume = optionalPositiveNumber(form.tankVolume)
+    if ([tankWidth, tankDepth, tankHeight, tankVolume].some(value => Number.isNaN(value))) {
+      setError('水槽サイズと実水量は、0より大きい数値で入力してください。')
+      setSaving(false)
+      return
+    }
+
     const payload = {
+      tank_width_cm: tankWidth,
+      tank_depth_cm: tankDepth,
+      tank_height_cm: tankHeight,
+      tank_volume_liters: tankVolume,
       ph,
       salt_mix_name: selectedText(form.saltMix, form.saltMixOther),
       filtration_method: selectedText(form.filtration, form.filtrationOther),
@@ -136,6 +158,10 @@ function LiteEnvironmentForm() {
   const previewPh = form.ph === '' || !Number.isFinite(Number(form.ph)) ? null : Number(form.ph)
   const previewTank = {
     ...tank,
+    tank_width_cm: optionalPositiveNumber(form.tankWidth),
+    tank_depth_cm: optionalPositiveNumber(form.tankDepth),
+    tank_height_cm: optionalPositiveNumber(form.tankHeight),
+    tank_volume_liters: optionalPositiveNumber(form.tankVolume),
     ph: previewPh,
     salt_mix_name: selectedText(form.saltMix, form.saltMixOther),
     filtration_method: selectedText(form.filtration, form.filtrationOther),
@@ -186,6 +212,19 @@ function LiteEnvironmentForm() {
         <form onSubmit={save} className="mt-6 space-y-6">
           <section className="border border-slate-700 bg-slate-900 p-4 sm:p-5">
             <h2 className="text-lg font-bold text-white">水槽の基本情報</h2>
+            <div className="mt-4">
+              <p className="text-base font-bold text-white">水槽サイズ（任意）</p>
+              <p className="mt-1 text-sm text-slate-400">分かる寸法だけでも保存できます。</p>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <NumberField label="幅" unit="cm" value={form.tankWidth} onChange={value => setForm(current => ({ ...current, tankWidth: value }))} placeholder="120" />
+                <NumberField label="奥行" unit="cm" value={form.tankDepth} onChange={value => setForm(current => ({ ...current, tankDepth: value }))} placeholder="55" />
+                <NumberField label="高さ" unit="cm" value={form.tankHeight} onChange={value => setForm(current => ({ ...current, tankHeight: value }))} placeholder="55" />
+              </div>
+            </div>
+            <div className="mt-5 max-w-sm">
+              <NumberField label="実水量" unit="L" value={form.tankVolume} onChange={value => setForm(current => ({ ...current, tankVolume: value }))} placeholder="350" />
+              <p className="mt-1 text-xs leading-5 text-slate-400">底砂や岩を入れた、おおよその水量で大丈夫です。</p>
+            </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label>
                 <span className="text-sm font-bold text-slate-200">pH（任意）</span>
@@ -252,6 +291,24 @@ function SelectWithOther({ label, value, otherValue, options, onChange, onOtherC
   )
 }
 
+function NumberField({ label, unit, value, onChange, placeholder }) {
+  return (
+    <label>
+      <span className="text-sm font-bold text-slate-200">{label} {unit}</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        min="0.01"
+        step="0.01"
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="mt-1 min-h-14 w-full border border-slate-600 bg-slate-950 px-4 text-xl font-bold text-white"
+      />
+    </label>
+  )
+}
+
 function EquipmentEditor({ title, help, options, items, onChange }) {
   const [selection, setSelection] = useState('')
   const [other, setOther] = useState('')
@@ -301,6 +358,12 @@ function selectedText(value, otherValue) {
   if (!value) return null
   const text = value === OTHER ? otherValue : value
   return String(text || '').trim().slice(0, 160) || null
+}
+
+function optionalPositiveNumber(value) {
+  if (value === '' || value == null) return null
+  const number = Number(value)
+  return Number.isFinite(number) && number > 0 ? number : Number.NaN
 }
 
 function Shell({ children }) {

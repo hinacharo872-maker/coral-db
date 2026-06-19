@@ -1,10 +1,19 @@
 import LiteTankEnvironmentDiagram from '@/components/LiteTankEnvironmentDiagram'
-import { formatEquipment, formatPh, hasLiteEnvironment, normalizeEquipment } from '@/lib/liteEnvironment'
+import {
+  formatEquipment,
+  formatPh,
+  formatTankDimensions,
+  formatTankVolume,
+  hasLiteEnvironment,
+  normalizeEquipment,
+} from '@/lib/liteEnvironment'
 
 export default function LiteEnvironmentSummary({ tank }) {
   if (!hasLiteEnvironment(tank)) return null
 
   const facts = [
+    formatTankDimensions(tank) && { label: '水槽サイズ', value: formatTankDimensions(tank) },
+    formatTankVolume(tank.tank_volume_liters) && { label: '実水量', value: formatTankVolume(tank.tank_volume_liters) },
     tank.filtration_method && { label: '濾過方式', value: tank.filtration_method },
     tank.salt_mix_name && { label: '人工海水', value: tank.salt_mix_name },
     normalizeEquipment(tank.lighting_equipment).length && {

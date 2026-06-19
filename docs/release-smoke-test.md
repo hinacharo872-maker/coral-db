@@ -21,6 +21,9 @@ users or shops.
 - Record a water change.
 - Register an additive currently in use.
 - Add a tank photo.
+- Save only tank dimensions and confirm partial dimension input remains valid.
+- Save only actual water volume and confirm it remains valid.
+- Confirm entered tank dimensions and actual water volume appear in the shop card and shared record.
 - Leave every optional environment field empty and confirm Lite remains usable.
 - Enter one or more of pH, salt mix, lighting, wave pumps, and filtration.
 - Open the in-app `ショップに見せる` screen.

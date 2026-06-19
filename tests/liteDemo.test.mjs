@@ -7,6 +7,9 @@ test('nagarehana demo is isolated and contains the complete shop review record',
 
   assert.equal(demo.isDemo, true)
   assert.equal(demo.tank.tank_volume_liters, 120)
+  assert.equal(demo.tank.tank_width_cm, 60)
+  assert.equal(demo.tank.tank_depth_cm, 45)
+  assert.equal(demo.tank.tank_height_cm, 45)
   assert.equal(demo.tank.water_change_frequency_days, 14)
   assert.equal(demo.tank.water_change_volume_liters, 20)
   assert.equal(demo.tank.ph, 8.2)

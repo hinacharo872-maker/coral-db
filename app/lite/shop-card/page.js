@@ -74,7 +74,7 @@ function LiteShopCard() {
 
       let tankQuery = supabase
         .from('lite_tank_profiles')
-        .select('id, display_name, tank_volume_liters, water_change_frequency_days, water_change_volume_liters, last_water_change_at, photo_url, ph, salt_mix_name, lighting_equipment, wave_pumps, filtration_method')
+        .select('id, display_name, tank_width_cm, tank_depth_cm, tank_height_cm, tank_volume_liters, water_change_frequency_days, water_change_volume_liters, last_water_change_at, photo_url, ph, salt_mix_name, lighting_equipment, wave_pumps, filtration_method')
       tankQuery = requestedTankId ? tankQuery.eq('id', requestedTankId) : tankQuery.order('created_at').limit(1)
       const tankResult = await tankQuery.maybeSingle()
       if (tankResult.error || !tankResult.data) {
@@ -175,7 +175,7 @@ function LiteShopCard() {
 
       <section className="mt-4 grid gap-3 sm:grid-cols-[1fr_220px]">
         <div className="grid grid-cols-2 gap-2">
-          <Fact label="水槽サイズ" value={record.tank.tank_volume_liters != null ? `${record.tank.tank_volume_liters} L` : '未登録'} />
+          {record.tank.tank_volume_liters != null && <Fact label="実水量" value={`${record.tank.tank_volume_liters} L`} />}
           <Fact label="水換え頻度" value={record.tank.water_change_frequency_days ? `${record.tank.water_change_frequency_days}日ごと` : '未登録'} />
           <Fact label="1回の換水量" value={record.tank.water_change_volume_liters != null ? `${record.tank.water_change_volume_liters} L` : '未登録'} />
           <Fact label="最終換水日" value={formatDate(record.tank.last_water_change_at)} />
@@ -279,7 +279,7 @@ function DemoShopCard({ record }) {
       </section>
 
       <section className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Fact label="水槽サイズ" value={`${record.tank.tank_volume_liters} L`} />
+        <Fact label="実水量" value={`${record.tank.tank_volume_liters} L`} />
         <Fact label="水換え頻度" value="2週間に1回" />
         <Fact label="1回の換水量" value={`${record.tank.water_change_volume_liters} L`} />
         <Fact label="最終換水日" value={`8日前（${formatDate(record.tank.last_water_change_at)}）`} />

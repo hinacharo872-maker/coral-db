@@ -182,9 +182,9 @@ export default function SharedShopRecordPage() {
         <div>
           <p className="text-sm font-bold text-cyan-300">SHOP RECORD</p>
           <h1 className="mt-1 text-3xl font-bold text-white sm:text-4xl">{record.tank?.display_name || '名称未設定の水槽'}</h1>
-          <p className="mt-3 text-2xl font-bold text-white">
-            {record.tank?.tank_volume_liters != null ? `${record.tank.tank_volume_liters} L` : '水量未登録'}
-          </p>
+          {record.tank?.tank_volume_liters != null && (
+            <p className="mt-3 text-2xl font-bold text-white">実水量: {record.tank.tank_volume_liters} L</p>
+          )}
           <p className="mt-2 text-sm text-slate-400">
             最終測定: {latest?.measured_at ? new Date(latest.measured_at).toLocaleString('ja-JP') : '未測定'}
           </p>

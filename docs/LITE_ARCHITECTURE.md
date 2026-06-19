@@ -58,7 +58,7 @@ ownership boundaries are:
 ### `lite_tank_profiles`
 
 One simple Lite profile per aquarium. Holds the minimum tank context a shop
-needs. Optional pH, salt mix, lighting, wave pumps, and filtration are stored
+needs. Optional width, depth, height, tank volume, pH, salt mix, lighting, wave pumps, and filtration are stored
 here as shop-facing context. They do not join the five-parameter measurement
 flow and remain nullable.
 
