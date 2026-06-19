@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
+import LiteBetaBanner from '@/components/LiteBetaBanner'
 import { supabase } from '@/lib/supabase'
 import {
   LITE_MEASUREMENT_STEPS,
@@ -281,6 +282,7 @@ function Shell({ children }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <Header />
+      <LiteBetaBanner />
       <main className="mx-auto max-w-4xl px-4 py-7">{children}</main>
     </div>
   )

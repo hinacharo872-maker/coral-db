@@ -4,7 +4,9 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
+import LiteBetaBanner from '@/components/LiteBetaBanner'
 import LiteEnvironmentSummary from '@/components/LiteEnvironmentSummary'
+import LiteFeedbackLink from '@/components/LiteFeedbackLink'
 import { supabase } from '@/lib/supabase'
 import { LITE_PARAMETER_LABELS, LITE_TARGETS, findMissingKeys, judgeAll } from '@/lib/liteTargets'
 import { createNagarehanaDemo, NAGAREHANA_DEMO_ID } from '@/lib/liteDemo'
@@ -445,7 +447,11 @@ function PageShell({ children }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <Header />
-      <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4">{children}</main>
+      <LiteBetaBanner />
+      <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4">
+        {children}
+        <LiteFeedbackLink />
+      </main>
     </div>
   )
 }

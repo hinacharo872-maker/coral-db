@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/Header'
+import LiteBetaBanner from '@/components/LiteBetaBanner'
+import LiteFeedbackLink from '@/components/LiteFeedbackLink'
 import { supabase } from '@/lib/supabase'
 import { LITE_MEASUREMENT_STEPS } from '@/lib/liteMeasurement'
 import { LITE_PARAMETER_LABELS, judgeAll } from '@/lib/liteTargets'
@@ -124,7 +126,6 @@ export default function LiteHomePage() {
           </Link>
         </section>
         <section className="mx-auto max-w-md border border-slate-700 bg-slate-900 p-5">
-          <p className="text-sm font-bold text-cyan-300">ReefChart Lite β版</p>
           <h1 className="mt-1 text-3xl font-bold text-white">かんたん水質記録</h1>
           <p className="mt-3 leading-relaxed text-slate-300">測れた項目だけで大丈夫です。ショップへ見せやすい水槽カルテを作ります。</p>
           <p className="mt-2 text-sm text-amber-100">現在はβ版です。大切な記録はCSVでのバックアップをおすすめします。</p>
@@ -140,7 +141,6 @@ export default function LiteHomePage() {
 
   return (
     <Shell>
-      <p className="text-sm font-bold text-cyan-300">ReefChart Lite β版</p>
       <h1 className="mt-1 text-3xl font-bold text-white">Liteホーム</h1>
       <p className="mt-2 text-slate-300">今日は測れた項目だけ記録しましょう。</p>
       <p className="mt-2 text-sm text-slate-400">現在はβ版です。大切な記録はCSVでのバックアップをおすすめします。</p>
@@ -253,7 +253,11 @@ function Shell({ children }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <Header />
-      <main className="mx-auto max-w-5xl px-4 py-7">{children}</main>
+      <LiteBetaBanner />
+      <main className="mx-auto max-w-5xl px-4 py-7">
+        {children}
+        <LiteFeedbackLink />
+      </main>
     </div>
   )
 }
