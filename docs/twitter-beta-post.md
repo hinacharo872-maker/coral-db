@@ -16,6 +16,6 @@ ReefChart Lite β版を公開しました。
 
 初心者や高齢の方でも使いやすいよう、項目を絞っています。
 
-https://coral-db.vercel.app
+https://reefchart-lite.vercel.app/lite
 
 フィードバック歓迎です。

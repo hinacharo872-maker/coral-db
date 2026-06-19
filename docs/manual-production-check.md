@@ -1,6 +1,9 @@
 # ReefChart Lite 本番手動確認
 
-対象URL: <https://coral-db.vercel.app>
+対象URL: <https://reefchart-lite.vercel.app/lite>
+
+新しいVercelデプロイの確認が完了するまでは、暫定URL
+<https://coral-db.vercel.app/lite> を使用する。
 
 本番アカウントでログインし、確認前の入力値を控えてから実施する。
 テスト後は必要に応じて元の値へ戻す。

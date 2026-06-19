@@ -1,10 +1,13 @@
 # ReefChart Lite Beta Release Checklist
 
-Target URL: https://coral-db.vercel.app
+Target URL: https://reefchart-lite.vercel.app/lite
+
+Temporary URL until the target deployment succeeds:
+https://coral-db.vercel.app/lite
 
 ## Public Pages
 
-- [ ] `https://coral-db.vercel.app` opens successfully.
+- [ ] `https://reefchart-lite.vercel.app/lite` opens successfully.
 - [ ] The browser title and visible brand say `ReefChart Lite`.
 - [ ] Old public brand names are not visible.
 - [ ] `/privacy` opens.
@@ -13,17 +16,20 @@ Target URL: https://coral-db.vercel.app
 
 ## Vercel And Environment
 
-- [ ] The Vercel production project uses the `coral-db.vercel.app` alias.
+- [ ] The Vercel production project uses the `reefchart-lite.vercel.app` alias.
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` contains the production Supabase URL.
 - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` contains the production anon key.
-- [ ] `NEXT_PUBLIC_SITE_URL=https://coral-db.vercel.app`.
+- [ ] `NEXT_PUBLIC_SITE_URL=https://reefchart-lite.vercel.app`.
+- [ ] `NEXT_PUBLIC_PRO_ENABLED=false`.
+- [ ] `NEXT_PUBLIC_FEEDBACK_URL` is set only when a feedback destination is ready.
 - [ ] No service role key has a `NEXT_PUBLIC_` prefix.
 - [ ] No service role key appears in browser JavaScript or page source.
 
 ## Supabase Auth
 
-- [ ] Supabase Site URL is `https://coral-db.vercel.app`.
-- [ ] Redirect URLs include `https://coral-db.vercel.app/**`.
+- [ ] Supabase Site URL is `https://reefchart-lite.vercel.app`.
+- [ ] Redirect URLs include `https://reefchart-lite.vercel.app/**`.
+- [ ] Redirect URLs keep `https://coral-db.vercel.app/**` during the transition.
 - [ ] Redirect URLs include `http://localhost:3000/**`.
 - [ ] Redirect URLs include `https://*.vercel.app/**`.
 - [ ] Email login returns to ReefChart Lite.
@@ -69,4 +75,4 @@ Target URL: https://coral-db.vercel.app
 - [ ] X/Twitter preview title is `ReefChart Lite`.
 - [ ] Description explains the free shop-friendly aquarium log.
 - [ ] The 1200x630 beta image loads.
-- [ ] Canonical and Open Graph URLs use `https://coral-db.vercel.app`.
+- [ ] Canonical and Open Graph URLs use `https://reefchart-lite.vercel.app`.

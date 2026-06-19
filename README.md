@@ -74,7 +74,7 @@ Create `.env.local` from `.env.example`.
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
-NEXT_PUBLIC_SITE_URL=https://coral-db.vercel.app
+NEXT_PUBLIC_SITE_URL=https://reefchart-lite.vercel.app
 NEXT_PUBLIC_PRO_ENABLED=false
 NEXT_PUBLIC_FEEDBACK_URL=
 ```
@@ -123,11 +123,21 @@ The intended production flow is:
 4. Vercel deploys the Next.js app.
 5. Verify the production URL.
 
-Production URL:
+ReefChart Lite beta URL:
 
 ```text
-https://coral-db.vercel.app/
+https://reefchart-lite.vercel.app/lite
 ```
+
+Until the `reefchart-lite` Vercel deployment is healthy, the temporary beta
+URL remains:
+
+```text
+https://coral-db.vercel.app/lite
+```
+
+`NEXT_PUBLIC_SITE_URL` must contain the origin without `/lite`. Application
+links keep the current `/lite` route prefix.
 
 ## Android Development
 
@@ -165,8 +175,10 @@ The debug APK is generated at:
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The current MVP loads `https://coral-db.vercel.app` and therefore requires an
-internet connection. Before a Google Play production release, move the
+The current Android MVP continues to load the temporary
+`https://coral-db.vercel.app` origin and therefore requires an internet
+connection. Update it only after the new beta deployment is verified. Before a
+Google Play production release, move the
 production web assets into the app package and complete native deep-link,
 notification, icon, splash screen, signing, and offline-storage work.
 
