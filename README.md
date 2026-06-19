@@ -69,15 +69,23 @@ The production project currently relies on Supabase GitHub integration. When cha
 
 ## Environment Variables
 
-Create `.env.local` from `.env.local.example`.
+Create `.env.local` from `.env.example`.
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
 NEXT_PUBLIC_SITE_URL=https://coral-db.vercel.app
+NEXT_PUBLIC_PRO_ENABLED=false
+NEXT_PUBLIC_FEEDBACK_URL=
 ```
 
 For Vercel production, set the same variables in the Vercel project settings.
+
+- `NEXT_PUBLIC_PRO_ENABLED=true` enables the Pro navigation and `/pro` routes.
+- Any other value, including an unset value, keeps Pro hidden and redirects
+  direct `/pro` access to `/lite`.
+- `NEXT_PUBLIC_FEEDBACK_URL` is the external feedback form URL. Leave it unset
+  to hide feedback links.
 
 ## Local Development
 
