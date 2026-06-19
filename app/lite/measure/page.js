@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import LiteBetaBanner from '@/components/LiteBetaBanner'
+import { trackLiteEvent } from '@/lib/liteAnalytics'
 import { supabase } from '@/lib/supabase'
 import {
   LITE_MEASUREMENT_STEPS,
@@ -107,7 +108,10 @@ function LiteMeasureFlow() {
       measured_at: new Date().toISOString(),
     })
     if (error) setError('記録を保存できませんでした。入力内容はこの画面に残っています。もう一度お試しください。')
-    else setSaved(true)
+    else {
+      trackLiteEvent('measurement_saved')
+      setSaved(true)
+    }
     setSaving(false)
   }
 

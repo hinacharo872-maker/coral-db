@@ -1,4 +1,5 @@
 import './globals.css'
+import { Analytics } from '@vercel/analytics/next'
 import PwaRegister from '@/components/PwaRegister'
 import Footer from '@/components/Footer'
 import { configuredSiteUrl } from '@/lib/siteUrl'
@@ -57,6 +58,7 @@ export default function RootLayout({ children }) {
         <PwaRegister />
         {children}
         <Footer />
+        <Analytics />
       </body>
     </html>
   )

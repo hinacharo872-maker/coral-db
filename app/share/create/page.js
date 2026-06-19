@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import Header from '@/components/Header'
+import { trackLiteEvent } from '@/lib/liteAnalytics'
 import { supabase } from '@/lib/supabase'
 import { browserSiteUrl } from '@/lib/siteUrl'
 
@@ -116,7 +117,10 @@ export default function CreateSharePage() {
       expires_at: expiresAtFor(expiry),
     })
     if (error) setError('共有リンクを作成できませんでした。')
-    else await loadData()
+    else {
+      trackLiteEvent('share_link_created')
+      await loadData()
+    }
     setSaving(false)
   }
 
