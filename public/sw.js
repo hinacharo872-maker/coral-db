@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reefchart-shell-v2'
+const CACHE_NAME = 'reefchart-shell-v3'
 const APP_SHELL = ['/offline.html', '/manifest.webmanifest', '/app-icon.svg', '/icons/icon-192.png', '/icons/icon-512.png']
 
 self.addEventListener('install', event => {
