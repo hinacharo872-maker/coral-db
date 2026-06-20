@@ -10,6 +10,7 @@ import LiteFeedbackLink from '@/components/LiteFeedbackLink'
 import { supabase } from '@/lib/supabase'
 import { LITE_PARAMETER_LABELS, LITE_TARGETS, findMissingKeys, judgeAll } from '@/lib/liteTargets'
 import { createNagarehanaDemo, NAGAREHANA_DEMO_ID } from '@/lib/liteDemo'
+import { LocalLiteStore } from '@/lib/localLiteStore'
 
 const PARAMETERS = [
   { key: 'kh_dkh', unit: 'dKH' },
@@ -69,7 +70,13 @@ function LiteShopCard() {
       }
       const { data: authData } = await supabase.auth.getSession()
       if (!authData.session) {
-        setError('Liteホームからログインしてください。')
+        const store = new LocalLiteStore(window.localStorage)
+        const guest = store.buildShopRecord()
+        if (guest && (!requestedTankId || requestedTankId === guest.tank.id)) {
+          setRecord(guest)
+        } else {
+          setError('Liteホームから「メールなしで使ってみる」を選んでください。')
+        }
         setLoading(false)
         return
       }
@@ -173,6 +180,7 @@ function LiteShopCard() {
           <Link href="/lite" className="min-h-11 shrink-0 border border-slate-600 px-3 py-2 text-sm font-bold text-slate-200">戻る</Link>
         </div>
         <p className="mt-2 text-sm text-slate-400">この画面をそのままショップ店員に見せてください。</p>
+        {record.isGuest && <p className="mt-3 border border-cyan-800 bg-cyan-950/40 p-3 text-sm text-cyan-50">この端末に保存した記録を表示しています。</p>}
       </section>
 
       <section className="mt-4 grid gap-3 sm:grid-cols-[1fr_220px]">
@@ -245,6 +253,11 @@ function LiteShopCard() {
         <p>これは診断ではありません。ショップが確認するための記録です。</p>
         <p className="mt-1">添加や購入の判断は、この画面を見ながらショップと相談してください。</p>
       </section>
+      {record.isGuest && (
+        <Link href="/share/create" className="mt-4 flex min-h-14 items-center justify-center border border-cyan-500 px-5 text-lg font-bold text-cyan-100">
+          共有リンクを作る
+        </Link>
+      )}
     </PageShell>
   )
 }

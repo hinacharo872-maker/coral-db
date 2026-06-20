@@ -6,6 +6,7 @@ import Header from '@/components/Header'
 import { trackLiteEvent } from '@/lib/liteAnalytics'
 import { supabase } from '@/lib/supabase'
 import { browserSiteUrl } from '@/lib/siteUrl'
+import { LocalLiteStore } from '@/lib/localLiteStore'
 
 const EXPIRY_OPTIONS = [
   { value: '24h', label: '24時間' },
@@ -45,8 +46,10 @@ export default function CreateSharePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [copiedId, setCopiedId] = useState(null)
+  const [hasGuestData, setHasGuestData] = useState(false)
 
   useEffect(() => {
+    setHasGuestData(new LocalLiteStore(window.localStorage).hasData())
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       setAuthChecked(true)
@@ -178,8 +181,9 @@ export default function CreateSharePage() {
     return (
       <PageShell>
         <section className="max-w-md border border-slate-700 bg-slate-900 p-5">
-          <h1 className="text-2xl font-bold text-white">ショップ共有</h1>
-          <p className="mt-2 text-sm text-slate-300">共有リンクの作成にはログインが必要です。</p>
+          <h1 className="text-2xl font-bold text-white">共有リンクを作るにはログインが必要です</h1>
+          <p className="mt-3 text-base leading-7 text-slate-300">共有リンクはクラウドに保存して発行するため、無料ログインが必要です。</p>
+          {hasGuestData && <p className="mt-4 border border-cyan-800 bg-cyan-950/40 p-3 text-sm leading-6 text-cyan-50">ログイン後にこの端末の記録を移行できます（準備中）。ゲストの記録は消えません。</p>}
           <form onSubmit={sendMagicLink} className="mt-5 space-y-3">
             <input
               type="email"
@@ -203,6 +207,7 @@ export default function CreateSharePage() {
         <p className="text-sm font-semibold text-cyan-300">ReefChart Lite</p>
         <h1 className="mt-1 text-3xl font-bold text-white">ショップ共有</h1>
         <p className="mt-2 text-sm text-slate-300">水槽カルテをURLまたはQRコードで店員へ見せられます。新しく作る共有は24時間または7日で自動的に期限切れになります。</p>
+        {hasGuestData && <p className="mt-4 border border-cyan-800 bg-cyan-950/40 p-3 text-sm text-cyan-50">この端末にゲスト記録があります。クラウドへの移行は準備中です。ゲスト記録はそのまま残ります。</p>}
       </div>
 
       {error && <p className="mt-5 border border-rose-700 bg-rose-950 p-3 text-rose-100">{error}</p>}
