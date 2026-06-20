@@ -142,7 +142,7 @@ export default function LiteHomePage() {
             はじめる
           </button>
           <p className="mt-3 text-center text-base text-cyan-100">この端末だけに記録して、すぐ試せます</p>
-          <p className="mt-4 text-center text-sm leading-6 text-slate-400">クラウド保存や共有リンクは、必要になった時だけ設定できます。</p>
+          <p className="mt-4 text-center text-sm leading-6 text-slate-400">登録なしで、すぐに記録を始められます。</p>
         </section>
         <section className="mx-auto mt-4 max-w-md border border-amber-500 bg-amber-950/50 p-5">
           <p className="text-xs font-bold text-amber-200">記録を残さず確認できます</p>

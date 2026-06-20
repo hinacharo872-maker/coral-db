@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { LITE_PARAMETER_LABELS, LITE_TARGETS, findMissingKeys, judgeAll } from '@/lib/liteTargets'
 import { createNagarehanaDemo, NAGAREHANA_DEMO_ID } from '@/lib/liteDemo'
 import { LocalLiteStore } from '@/lib/localLiteStore'
+import { isLiteShareEnabled } from '@/lib/publicFeatures'
 
 const PARAMETERS = [
   { key: 'kh_dkh', unit: 'dKH' },
@@ -58,6 +59,7 @@ function LiteShopCard() {
   const [record, setRecord] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const shareEnabled = isLiteShareEnabled(process.env.NEXT_PUBLIC_LITE_SHARE_ENABLED)
 
   useEffect(() => {
     async function load() {
@@ -253,7 +255,7 @@ function LiteShopCard() {
         <p>これは診断ではありません。ショップが確認するための記録です。</p>
         <p className="mt-1">添加や購入の判断は、この画面を見ながらショップと相談してください。</p>
       </section>
-      {record.isGuest && (
+      {record.isGuest && shareEnabled && (
         <Link href="/share/create" className="mt-4 flex min-h-14 items-center justify-center border border-cyan-500 px-5 text-lg font-bold text-cyan-100">
           共有リンクを作る
         </Link>

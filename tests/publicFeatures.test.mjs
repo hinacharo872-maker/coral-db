@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
-import { isProEnabled } from '../lib/publicFeatures.js'
+import { isLiteShareEnabled, isProEnabled } from '../lib/publicFeatures.js'
 
 test('Pro is enabled only by the exact public feature flag value', () => {
   assert.equal(isProEnabled('true'), true)
   assert.equal(isProEnabled('false'), false)
   assert.equal(isProEnabled('TRUE'), false)
   assert.equal(isProEnabled(undefined), false)
+})
+
+test('Lite share links stay hidden unless explicitly enabled', () => {
+  assert.equal(isLiteShareEnabled('true'), true)
+  assert.equal(isLiteShareEnabled('false'), false)
+  assert.equal(isLiteShareEnabled('TRUE'), false)
+  assert.equal(isLiteShareEnabled(undefined), false)
 })
 
 test('Pro middleware covers the full Pro route tree and redirects to Lite', async () => {

@@ -9,7 +9,15 @@ test('guest shop card reads the local record and keeps the environment diagram',
   assert.match(source, /buildShopRecord/)
   assert.match(source, /<LiteEnvironmentSummary tank=\{record\.tank\}/)
   assert.match(source, /この端末に保存した記録を表示しています/)
+  assert.match(source, /record\.isGuest && shareEnabled/)
+  assert.match(source, /NEXT_PUBLIC_LITE_SHARE_ENABLED/)
   assert.match(source, /href="\/share\/create"/)
+})
+
+test('Lite landing does not promote share links or email login', () => {
+  const source = read('app/lite/page.js')
+  assert.doesNotMatch(source, /共有リンク/)
+  assert.doesNotMatch(source, /type="email"/)
 })
 
 test('guest share creation explains cloud storage only at the share step', () => {
