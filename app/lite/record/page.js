@@ -120,7 +120,7 @@ function RecordForm() {
     if (!file) return
     setError('')
     try {
-      const photoData = await resizeImage(file)
+      const photoData = await resizeImage(file, isGuest ? { maxSize: 640, quality: 0.6 } : undefined)
       setForm(current => ({ ...current, photoData, photoName: file.name }))
     } catch {
       setError('写真を読み込めませんでした。別の写真をお試しください。')
@@ -165,6 +165,24 @@ function RecordForm() {
         result = { error: null }
       } catch {
         result = { error: true }
+      }
+    } else if (isGuest && type === 'photo') {
+      if (!form.photoData) {
+        setError('追加する写真を選んでください。')
+        setSaving(false)
+        return
+      }
+      try {
+        new LocalLiteStore(window.localStorage).addPhoto({
+          photo_url: form.photoData,
+          taken_at: new Date(`${form.takenAt || new Date().toISOString().slice(0, 10)}T12:00:00`).toISOString(),
+          note: form.note.trim() || null,
+        })
+        result = { error: null }
+      } catch {
+        setError('写真を端末に保存できませんでした。端末の空き容量を確認するか、別の写真をお試しください。')
+        setSaving(false)
+        return
       }
     } else if (type === 'water-change') {
       result = await supabase.rpc('record_lite_water_change', {
@@ -239,18 +257,6 @@ function RecordForm() {
       </Shell>
     )
   }
-  if (isGuest && type === 'photo') {
-    return (
-      <Shell>
-        <section className="mx-auto max-w-xl border border-slate-700 bg-slate-900 p-6 text-center">
-          <h1 className="text-3xl font-bold text-white">写真を残すにはログインが必要です</h1>
-          <p className="mt-4 text-base leading-7 text-slate-300">写真は長期保存のためクラウドへ保存します。ゲストの記録は消さずにそのまま残ります。</p>
-          <Link href="/lite" className="mt-6 flex min-h-14 items-center justify-center bg-cyan-400 px-5 text-lg font-bold text-slate-950">Liteホームへ</Link>
-        </section>
-      </Shell>
-    )
-  }
-
   return (
     <Shell>
       <section className="mx-auto max-w-xl">
@@ -258,6 +264,7 @@ function RecordForm() {
         <h1 className="mt-1 text-3xl font-bold text-white">{definition.title}</h1>
         <p className="mt-2 text-sm text-slate-400">{definition.description}</p>
         {isGuest && <p className="mt-4 border border-cyan-800 bg-cyan-950/40 p-3 text-sm text-cyan-50">この記録はこの端末に保存されます。</p>}
+        {isGuest && type === 'photo' && <p className="mt-2 text-sm leading-6 text-slate-400">写真は小さく圧縮して、この端末内に最大3枚保存されます。</p>}
 
         <form onSubmit={save} className="mt-6 space-y-4">
           {type === 'water-change' && (
@@ -409,7 +416,7 @@ function TextField({ label, value, onChange, placeholder, required = false }) {
   )
 }
 
-function resizeImage(file) {
+function resizeImage(file, { maxSize = 960, quality = 0.7 } = {}) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = reject
@@ -417,13 +424,12 @@ function resizeImage(file) {
       const image = new Image()
       image.onerror = reject
       image.onload = () => {
-        const maxSize = 960
         const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
         const canvas = document.createElement('canvas')
         canvas.width = Math.round(image.width * scale)
         canvas.height = Math.round(image.height * scale)
         canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.7))
+        resolve(canvas.toDataURL('image/jpeg', quality))
       }
       image.src = reader.result
     }

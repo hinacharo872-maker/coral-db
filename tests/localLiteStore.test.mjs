@@ -77,6 +77,26 @@ test('guest water changes and additives stay on the device', () => {
   assert.equal(data.additives[0].product_name_snapshot, 'Buffer')
 })
 
+test('guest photos stay on the device and the latest photo appears in the shop card', () => {
+  const store = createStore()
+  store.addPhoto({ photo_url: 'data:image/jpeg;base64,first', taken_at: '2026-06-19T12:00:00.000Z' })
+  store.addPhoto({ photo_url: 'data:image/jpeg;base64,latest', taken_at: '2026-06-20T12:00:00.000Z', note: '今日' })
+
+  const record = store.buildShopRecord()
+  assert.equal(record.photo.photo_url, 'data:image/jpeg;base64,latest')
+  assert.equal(record.photo.note, '今日')
+})
+
+test('guest data saved before photo support remains readable', () => {
+  const storage = memoryStorage()
+  const store = createStore(storage)
+  const data = store.start()
+  delete data.photos
+  storage.setItem(GUEST_LITE_STORAGE_KEY, JSON.stringify(data))
+
+  assert.deepEqual(store.read().photos, [])
+})
+
 test('invalid or unavailable local data does not crash the app', () => {
   const storage = memoryStorage()
   storage.setItem(GUEST_LITE_STORAGE_KEY, '{broken')

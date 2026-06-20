@@ -13,13 +13,14 @@ test('Lite starts with a simple primary action and no initial email form', () =>
   assert.doesNotMatch(source, /ログインして記録を保存/)
 })
 
-test('guest measurement, environment, water change, and additive screens use local storage', () => {
+test('guest measurement, environment, water change, additive, and photo screens use local storage', () => {
   assert.match(read('app/lite/measure/page.js'), /addMeasurement/)
   assert.match(read('app/lite/profile/page.js'), /saveTankProfile/)
   const record = read('app/lite/record/page.js')
   assert.match(record, /addWaterChange/)
   assert.match(record, /addAdditive/)
-  assert.match(record, /写真を残すにはログインが必要です/)
+  assert.match(record, /addPhoto/)
+  assert.match(record, /写真は小さく圧縮して、この端末内に最大3枚保存されます/)
 })
 
 test('authenticated save paths remain connected to Supabase', () => {
