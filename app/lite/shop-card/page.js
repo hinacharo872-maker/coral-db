@@ -75,7 +75,7 @@ function LiteShopCard() {
         if (guest && (!requestedTankId || requestedTankId === guest.tank.id)) {
           setRecord(guest)
         } else {
-          setError('Liteホームから「メールなしで使ってみる」を選んでください。')
+          setError('Liteホームから「はじめる」を選んでください。')
         }
         setLoading(false)
         return

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
 import Header from '@/components/Header'
 import { trackLiteEvent } from '@/lib/liteAnalytics'
@@ -106,7 +107,7 @@ export default function CreateSharePage() {
       email,
       options: { emailRedirectTo: `${browserSiteUrl()}/share/create` },
     })
-    setAuthMessage(error ? 'ログインメールを送信できませんでした。' : 'ログインリンクをメールへ送りました。')
+    setAuthMessage(error ? '確認メールを送信できませんでした。' : 'クラウド保存を始めるための確認リンクをメールへ送りました。')
   }
 
   async function createShare() {
@@ -181,9 +182,10 @@ export default function CreateSharePage() {
     return (
       <PageShell>
         <section className="max-w-md border border-slate-700 bg-slate-900 p-5">
-          <h1 className="text-2xl font-bold text-white">共有リンクを作るにはログインが必要です</h1>
-          <p className="mt-3 text-base leading-7 text-slate-300">共有リンクはクラウドに保存して発行するため、無料ログインが必要です。</p>
-          {hasGuestData && <p className="mt-4 border border-cyan-800 bg-cyan-950/40 p-3 text-sm leading-6 text-cyan-50">ログイン後にこの端末の記録を移行できます（準備中）。ゲストの記録は消えません。</p>}
+          <h1 className="text-2xl font-bold text-white">共有リンクを作るにはクラウド保存が必要です</h1>
+          <p className="mt-3 text-base leading-7 text-slate-300">共有リンクを作るには、記録をクラウドに保存する必要があります。</p>
+          <p className="mt-2 text-base leading-7 text-cyan-100">今はこのスマホ画面をそのままショップに見せることもできます。</p>
+          {hasGuestData && <p className="mt-4 border border-cyan-800 bg-cyan-950/40 p-3 text-sm leading-6 text-cyan-50">クラウド保存を設定した後、この端末の記録を移行できるよう準備中です。ゲストの記録は消えません。</p>}
           <form onSubmit={sendMagicLink} className="mt-5 space-y-3">
             <input
               type="email"
@@ -193,9 +195,10 @@ export default function CreateSharePage() {
               placeholder="メールアドレス"
               className="w-full border border-slate-600 bg-slate-950 px-4 py-3 text-white"
             />
-            <button className="w-full bg-cyan-400 px-4 py-3 font-bold text-slate-950">ログインリンクを送る</button>
+            <button className="min-h-14 w-full bg-cyan-400 px-4 py-3 text-lg font-bold text-slate-950">クラウド保存を設定する</button>
           </form>
           {authMessage && <p className="mt-3 text-sm text-cyan-200">{authMessage}</p>}
+          <Link href="/lite/shop-card" className="mt-4 flex min-h-12 items-center justify-center border border-slate-600 px-4 font-bold text-slate-200">ショップに見せる画面へ戻る</Link>
         </section>
       </PageShell>
     )

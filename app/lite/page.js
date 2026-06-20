@@ -8,22 +8,18 @@ import LiteFeedbackLink from '@/components/LiteFeedbackLink'
 import { supabase } from '@/lib/supabase'
 import { LITE_MEASUREMENT_STEPS } from '@/lib/liteMeasurement'
 import { LITE_PARAMETER_LABELS, judgeAll } from '@/lib/liteTargets'
-import { browserSiteUrl } from '@/lib/siteUrl'
 import { LocalLiteStore } from '@/lib/localLiteStore'
 import { trackLiteEvent } from '@/lib/liteAnalytics'
 
 export default function LiteHomePage() {
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
-  const [email, setEmail] = useState('')
-  const [message, setMessage] = useState('')
   const [tanks, setTanks] = useState([])
   const [latestByTank, setLatestByTank] = useState({})
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [isGuest, setIsGuest] = useState(false)
-  const [showLogin, setShowLogin] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -110,16 +106,6 @@ export default function LiteHomePage() {
     setLoading(false)
   }
 
-  async function sendMagicLink(event) {
-    event.preventDefault()
-    setMessage('')
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${browserSiteUrl()}/lite` },
-    })
-    setMessage(error ? 'ログインメールを送れませんでした。もう一度お試しください。' : 'ログインリンクをメールへ送りました。')
-  }
-
   async function createLiteTank() {
     if (!session?.user?.id) return
     setCreating(true)
@@ -149,29 +135,19 @@ export default function LiteHomePage() {
     return (
       <Shell>
         <section className="mx-auto max-w-md border border-slate-700 bg-slate-900 p-5">
+          <p className="text-sm font-bold text-cyan-300">ReefChart Lite β</p>
           <h1 className="mt-1 text-3xl font-bold text-white">かんたん水質記録</h1>
           <p className="mt-3 leading-relaxed text-slate-300">測れた項目だけで大丈夫です。ショップへ見せやすい水槽カルテを作ります。</p>
           <button type="button" onClick={startGuest} className="mt-6 min-h-16 w-full bg-cyan-400 px-4 py-4 text-xl font-bold text-slate-950">
-            メールなしで使ってみる
+            はじめる
           </button>
           <p className="mt-3 text-center text-base text-cyan-100">この端末だけに記録して、すぐ試せます</p>
-          <button type="button" onClick={() => setShowLogin(current => !current)} className="mt-5 min-h-14 w-full border border-slate-500 px-4 py-3 text-lg font-bold text-white">
-            ログインして記録を保存
-          </button>
-          <p className="mt-3 text-sm leading-6 text-slate-400">共有リンクや別端末での利用にはログインが必要です。</p>
-          {showLogin && (
-            <form onSubmit={sendMagicLink} className="mt-5 space-y-3 border-t border-slate-700 pt-5">
-              <label className="block text-base font-bold text-white" htmlFor="lite-login-email">メールアドレス</label>
-              <input id="lite-login-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="メールアドレス" className="w-full border border-slate-600 bg-slate-950 px-4 py-4 text-lg text-white" />
-              <button className="min-h-14 w-full bg-slate-100 px-4 py-3 text-lg font-bold text-slate-950">ログインリンクを送る</button>
-            </form>
-          )}
-          {message && <p className="mt-3 text-sm text-cyan-200">{message}</p>}
+          <p className="mt-4 text-center text-sm leading-6 text-slate-400">クラウド保存や共有リンクは、必要になった時だけ設定できます。</p>
         </section>
         <section className="mx-auto mt-4 max-w-md border border-amber-500 bg-amber-950/50 p-5">
           <p className="text-xs font-bold text-amber-200">記録を残さず確認できます</p>
           <h2 className="mt-1 text-xl font-bold text-white">ナガレハナ不調デモ</h2>
-          <Link href="/lite/shop-card?demo=nagarehana" className="mt-4 flex min-h-14 items-center justify-center bg-amber-400 px-4 py-3 text-lg font-bold text-slate-950">デモを開く</Link>
+          <Link href="/lite/shop-card?demo=nagarehana" className="mt-4 flex min-h-14 items-center justify-center bg-amber-400 px-4 py-3 text-lg font-bold text-slate-950">デモを見る</Link>
         </section>
       </Shell>
     )

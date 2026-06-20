@@ -12,11 +12,11 @@ test('guest shop card reads the local record and keeps the environment diagram',
   assert.match(source, /href="\/share\/create"/)
 })
 
-test('guest share creation explains why login is required and preserves local data', () => {
+test('guest share creation explains cloud storage only at the share step', () => {
   const source = read('app/share/create/page.js')
-  assert.match(source, /共有リンクを作るにはログインが必要です/)
-  assert.match(source, /共有リンクはクラウドに保存して発行するため、無料ログインが必要です/)
-  assert.match(source, /ログイン後にこの端末の記録を移行できます（準備中）/)
+  assert.match(source, /共有リンクを作るにはクラウド保存が必要です/)
+  assert.match(source, /今はこのスマホ画面をそのままショップに見せることもできます/)
+  assert.match(source, /クラウド保存を設定する/)
   assert.doesNotMatch(source, /localStorage\.removeItem/)
 })
 

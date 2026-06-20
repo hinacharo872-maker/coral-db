@@ -143,7 +143,7 @@ function LiteMeasureFlow() {
   if (!session && !isGuest) {
     return (
       <Shell>
-        <Message title="ログインが必要です" body="Liteホームからログインすると測定を記録できます。" />
+        <Message title="Liteをはじめてください" body="Liteホームの「はじめる」から、すぐに測定を記録できます。" />
         <Link href="/lite" className="mt-4 flex min-h-12 items-center justify-center bg-cyan-400 px-4 py-3 font-bold text-slate-950">Liteホームへ</Link>
       </Shell>
     )
