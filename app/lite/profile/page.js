@@ -15,6 +15,7 @@ import {
   SALT_MIX_OPTIONS,
   WAVE_PUMP_OPTIONS,
 } from '@/lib/liteEnvironment'
+import { LocalLiteStore } from '@/lib/localLiteStore'
 
 const OTHER = '__other__'
 
@@ -35,6 +36,7 @@ function LiteEnvironmentForm() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [isGuest, setIsGuest] = useState(false)
   const [form, setForm] = useState({
     tankWidth: '',
     tankDepth: '',
@@ -54,6 +56,12 @@ function LiteEnvironmentForm() {
       const { data: authData } = await supabase.auth.getSession()
       setSession(authData.session)
       if (!authData.session) {
+        const guest = new LocalLiteStore(window.localStorage).read()
+        if (guest && (!requestedTankId || requestedTankId === guest.tank.id)) {
+          setIsGuest(true)
+          setTank(guest.tank)
+          fillForm(guest.tank)
+        }
         setLoading(false)
         return
       }
@@ -68,28 +76,32 @@ function LiteEnvironmentForm() {
       } else {
         const data = result.data
         setTank(data)
-        setForm({
-          tankWidth: data.tank_width_cm ?? '',
-          tankDepth: data.tank_depth_cm ?? '',
-          tankHeight: data.tank_height_cm ?? '',
-          tankVolume: data.tank_volume_liters ?? '',
-          ph: data.ph ?? '',
-          saltMix: SALT_MIX_OPTIONS.includes(data.salt_mix_name) ? data.salt_mix_name : data.salt_mix_name ? OTHER : '',
-          saltMixOther: SALT_MIX_OPTIONS.includes(data.salt_mix_name) ? '' : data.salt_mix_name || '',
-          filtration: FILTRATION_OPTIONS.includes(data.filtration_method) ? data.filtration_method : data.filtration_method ? OTHER : '',
-          filtrationOther: FILTRATION_OPTIONS.includes(data.filtration_method) ? '' : data.filtration_method || '',
-          lights: normalizeEquipment(data.lighting_equipment),
-          wavePumps: normalizeEquipment(data.wave_pumps),
-        })
+        fillForm(data)
       }
       setLoading(false)
     }
     load()
   }, [requestedTankId])
 
+  function fillForm(data) {
+    setForm({
+      tankWidth: data.tank_width_cm ?? '',
+      tankDepth: data.tank_depth_cm ?? '',
+      tankHeight: data.tank_height_cm ?? '',
+      tankVolume: data.tank_volume_liters ?? '',
+      ph: data.ph ?? '',
+      saltMix: SALT_MIX_OPTIONS.includes(data.salt_mix_name) ? data.salt_mix_name : data.salt_mix_name ? OTHER : '',
+      saltMixOther: SALT_MIX_OPTIONS.includes(data.salt_mix_name) ? '' : data.salt_mix_name || '',
+      filtration: FILTRATION_OPTIONS.includes(data.filtration_method) ? data.filtration_method : data.filtration_method ? OTHER : '',
+      filtrationOther: FILTRATION_OPTIONS.includes(data.filtration_method) ? '' : data.filtration_method || '',
+      lights: normalizeEquipment(data.lighting_equipment),
+      wavePumps: normalizeEquipment(data.wave_pumps),
+    })
+  }
+
   async function save(event) {
     event.preventDefault()
-    if (!session?.user?.id || !tank?.id) return
+    if (!tank?.id || (!isGuest && !session?.user?.id)) return
     setSaving(true)
     setError('')
     const ph = form.ph === '' ? null : Number(form.ph)
@@ -120,11 +132,21 @@ function LiteEnvironmentForm() {
       lighting_equipment: form.lights.length ? normalizeEquipment(form.lights) : null,
       wave_pumps: form.wavePumps.length ? normalizeEquipment(form.wavePumps) : null,
     }
-    const { error: saveError } = await supabase
-      .from('lite_tank_profiles')
-      .update(payload)
-      .eq('id', tank.id)
-      .eq('user_id', session.user.id)
+    let saveError = null
+    if (isGuest) {
+      try {
+        new LocalLiteStore(window.localStorage).saveTankProfile(payload)
+      } catch {
+        saveError = true
+      }
+    } else {
+      const result = await supabase
+        .from('lite_tank_profiles')
+        .update(payload)
+        .eq('id', tank.id)
+        .eq('user_id', session.user.id)
+      saveError = result.error
+    }
     if (saveError) setError('飼育環境を保存できませんでした。もう一度お試しください。')
     else {
       setTank(current => ({ ...current, ...payload }))
@@ -134,7 +156,7 @@ function LiteEnvironmentForm() {
   }
 
   if (loading) return <Shell><p className="text-slate-300">水槽プロフィールを読み込んでいます...</p></Shell>
-  if (error && session && !tank) {
+  if (error && (session || isGuest) && !tank) {
     return (
       <Shell>
         <section className="mx-auto max-w-xl border border-rose-700 bg-rose-950/40 p-6 text-center">
@@ -145,7 +167,7 @@ function LiteEnvironmentForm() {
       </Shell>
     )
   }
-  if (!session || !tank) {
+  if ((!session && !isGuest) || !tank) {
     return (
       <Shell>
         <section className="mx-auto max-w-xl border border-slate-700 bg-slate-900 p-6 text-center">
@@ -196,6 +218,7 @@ function LiteEnvironmentForm() {
         <p className="text-sm font-bold text-cyan-300">{tank.display_name || 'わたしの水槽'}</p>
         <h1 className="mt-1 text-3xl font-bold text-white">飼育環境</h1>
         <p className="mt-3 leading-7 text-slate-300">分かる項目だけで大丈夫です。すべて空欄でも保存できます。</p>
+        {isGuest && <p className="mt-4 border border-cyan-800 bg-cyan-950/40 p-3 text-sm text-cyan-50">この飼育環境はこの端末に保存されます。</p>}
 
         <section className="mt-6 border border-slate-700 bg-slate-900 p-3 sm:p-5">
           <h2 className="text-xl font-bold text-white">水槽図プレビュー</h2>

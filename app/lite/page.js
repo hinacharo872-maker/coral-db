@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabase'
 import { LITE_MEASUREMENT_STEPS } from '@/lib/liteMeasurement'
 import { LITE_PARAMETER_LABELS, judgeAll } from '@/lib/liteTargets'
 import { browserSiteUrl } from '@/lib/siteUrl'
+import { LocalLiteStore } from '@/lib/localLiteStore'
+import { trackLiteEvent } from '@/lib/liteAnalytics'
 
 export default function LiteHomePage() {
   const [session, setSession] = useState(null)
@@ -20,6 +22,8 @@ export default function LiteHomePage() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [isGuest, setIsGuest] = useState(false)
+  const [showLogin, setShowLogin] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -34,12 +38,35 @@ export default function LiteHomePage() {
   }, [])
 
   useEffect(() => {
+    if (!authChecked) return
     if (!session) {
+      const store = new LocalLiteStore(window.localStorage)
+      const guest = store.buildShopRecord()
+      if (guest) {
+        setIsGuest(true)
+        setTanks([guest.tank])
+        setLatestByTank({
+          [guest.tank.id]: {
+            measured_at: Object.values(guest.parameterLatest)
+              .filter(Boolean)
+              .map(item => item.measured_at)
+              .sort()
+              .at(-1) ?? null,
+            parameter_dates: {},
+            ...Object.fromEntries(Object.entries(guest.parameterLatest).map(([key, item]) => [key, item?.value ?? null])),
+          },
+        })
+      } else {
+        setIsGuest(false)
+        setTanks([])
+        setLatestByTank({})
+      }
       setLoading(false)
       return
     }
+    setIsGuest(false)
     loadLiteHome()
-  }, [session])
+  }, [session, authChecked])
 
   async function loadLiteHome() {
     setLoading(true)
@@ -107,33 +134,44 @@ export default function LiteHomePage() {
     setCreating(false)
   }
 
+  function startGuest() {
+    const store = new LocalLiteStore(window.localStorage)
+    const guest = store.start()
+    setIsGuest(true)
+    setTanks([guest.tank])
+    setLatestByTank({})
+    trackLiteEvent('lite_guest_started')
+  }
+
   if (!authChecked || loading) return <Shell><LiteLoading /></Shell>
 
-  if (!session) {
+  if (!session && !isGuest) {
     return (
       <Shell>
-        <section className="mx-auto mb-4 max-w-md border border-amber-500 bg-amber-950/50 p-5">
-          <p className="text-xs font-bold text-amber-200">ログインなしで確認できます</p>
-          <h1 className="mt-1 text-2xl font-bold text-white">ナガレハナ不調デモ</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-200">
-            水質の変化、添加剤、写真をまとめたショップ相談用カルテです。実データは変更しません。
-          </p>
-          <Link
-            href="/lite/shop-card?demo=nagarehana"
-            className="mt-4 flex min-h-14 items-center justify-center bg-amber-400 px-4 py-3 text-lg font-bold text-slate-950"
-          >
-            ナガレハナ不調デモを開く
-          </Link>
-        </section>
         <section className="mx-auto max-w-md border border-slate-700 bg-slate-900 p-5">
           <h1 className="mt-1 text-3xl font-bold text-white">かんたん水質記録</h1>
           <p className="mt-3 leading-relaxed text-slate-300">測れた項目だけで大丈夫です。ショップへ見せやすい水槽カルテを作ります。</p>
-          <p className="mt-2 text-sm text-amber-100">現在はβ版です。大切な記録はCSVでのバックアップをおすすめします。</p>
-          <form onSubmit={sendMagicLink} className="mt-6 space-y-3">
-            <input type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="メールアドレス" className="w-full border border-slate-600 bg-slate-950 px-4 py-4 text-lg text-white" />
-            <button className="min-h-14 w-full bg-cyan-400 px-4 py-3 text-lg font-bold text-slate-950">ログインリンクを送る</button>
-          </form>
+          <button type="button" onClick={startGuest} className="mt-6 min-h-16 w-full bg-cyan-400 px-4 py-4 text-xl font-bold text-slate-950">
+            メールなしで使ってみる
+          </button>
+          <p className="mt-3 text-center text-base text-cyan-100">この端末だけに記録して、すぐ試せます</p>
+          <button type="button" onClick={() => setShowLogin(current => !current)} className="mt-5 min-h-14 w-full border border-slate-500 px-4 py-3 text-lg font-bold text-white">
+            ログインして記録を保存
+          </button>
+          <p className="mt-3 text-sm leading-6 text-slate-400">共有リンクや別端末での利用にはログインが必要です。</p>
+          {showLogin && (
+            <form onSubmit={sendMagicLink} className="mt-5 space-y-3 border-t border-slate-700 pt-5">
+              <label className="block text-base font-bold text-white" htmlFor="lite-login-email">メールアドレス</label>
+              <input id="lite-login-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="メールアドレス" className="w-full border border-slate-600 bg-slate-950 px-4 py-4 text-lg text-white" />
+              <button className="min-h-14 w-full bg-slate-100 px-4 py-3 text-lg font-bold text-slate-950">ログインリンクを送る</button>
+            </form>
+          )}
           {message && <p className="mt-3 text-sm text-cyan-200">{message}</p>}
+        </section>
+        <section className="mx-auto mt-4 max-w-md border border-amber-500 bg-amber-950/50 p-5">
+          <p className="text-xs font-bold text-amber-200">記録を残さず確認できます</p>
+          <h2 className="mt-1 text-xl font-bold text-white">ナガレハナ不調デモ</h2>
+          <Link href="/lite/shop-card?demo=nagarehana" className="mt-4 flex min-h-14 items-center justify-center bg-amber-400 px-4 py-3 text-lg font-bold text-slate-950">デモを開く</Link>
         </section>
       </Shell>
     )
@@ -144,6 +182,12 @@ export default function LiteHomePage() {
       <h1 className="mt-1 text-3xl font-bold text-white">Liteホーム</h1>
       <p className="mt-2 text-slate-300">今日は測れた項目だけ記録しましょう。</p>
       <p className="mt-2 text-sm text-slate-400">現在はβ版です。大切な記録はCSVでのバックアップをおすすめします。</p>
+      {isGuest && (
+        <div className="mt-4 border border-cyan-800 bg-cyan-950/40 p-4 text-sm leading-6 text-cyan-50">
+          <p className="font-bold">この記録はこの端末に保存されています</p>
+          <p className="text-cyan-100">ブラウザのデータを削除すると消えることがあります。</p>
+        </div>
+      )}
 
       {error && <p className="mt-5 border border-rose-700 bg-rose-950 p-4 text-rose-100">{error}</p>}
 

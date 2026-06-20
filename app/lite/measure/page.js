@@ -13,6 +13,7 @@ import {
   findPreviousLiteValues,
   hasAnyLiteMeasurement,
 } from '@/lib/liteMeasurement'
+import { LocalLiteStore } from '@/lib/localLiteStore'
 
 export default function LiteMeasurePage() {
   return (
@@ -35,6 +36,7 @@ function LiteMeasureFlow() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [isGuest, setIsGuest] = useState(false)
 
   const reviewIndex = LITE_MEASUREMENT_STEPS.length
   const currentStep = LITE_MEASUREMENT_STEPS[stepIndex]
@@ -45,7 +47,18 @@ function LiteMeasureFlow() {
       const { data: authData } = await supabase.auth.getSession()
       const nextSession = authData.session
       setSession(nextSession)
-      if (!nextSession || !tankId) {
+      if (!nextSession) {
+        const store = new LocalLiteStore(window.localStorage)
+        const guest = store.read()
+        if (guest && (!tankId || tankId === guest.tank.id)) {
+          setIsGuest(true)
+          setTank(guest.tank)
+          setPrevious(findPreviousLiteValues(guest.measurements))
+        }
+        setLoading(false)
+        return
+      }
+      if (!tankId) {
         setLoading(false)
         return
       }
@@ -97,17 +110,27 @@ function LiteMeasureFlow() {
   }
 
   async function saveMeasurement() {
-    if (!hasAnyValue || !session?.user?.id || !tankId) return
+    if (!hasAnyValue || !tankId || (!isGuest && !session?.user?.id)) return
     setSaving(true)
     setError('')
     const payload = buildLiteMeasurementPayload(values)
-    const { error } = await supabase.from('lite_measurements').insert({
-      ...payload,
-      tank_id: tankId,
-      user_id: session.user.id,
-      measured_at: new Date().toISOString(),
-    })
-    if (error) setError('記録を保存できませんでした。入力内容はこの画面に残っています。もう一度お試しください。')
+    let saveError = null
+    if (isGuest) {
+      try {
+        new LocalLiteStore(window.localStorage).addMeasurement({ ...payload, measured_at: new Date().toISOString() })
+      } catch {
+        saveError = true
+      }
+    } else {
+      const result = await supabase.from('lite_measurements').insert({
+        ...payload,
+        tank_id: tankId,
+        user_id: session.user.id,
+        measured_at: new Date().toISOString(),
+      })
+      saveError = result.error
+    }
+    if (saveError) setError('記録を保存できませんでした。入力内容はこの画面に残っています。もう一度お試しください。')
     else {
       trackLiteEvent('measurement_saved')
       setSaved(true)
@@ -117,7 +140,7 @@ function LiteMeasureFlow() {
 
   if (loading) return <Shell><p className="text-slate-300">前回の記録を確認しています...</p></Shell>
 
-  if (!session) {
+  if (!session && !isGuest) {
     return (
       <Shell>
         <Message title="ログインが必要です" body="Liteホームからログインすると測定を記録できます。" />
@@ -168,6 +191,7 @@ function LiteMeasureFlow() {
           </div>
           <span className="text-sm font-bold text-slate-300">{Math.min(stepIndex + 1, 6)} / 6</span>
         </div>
+        {isGuest && <p className="mt-4 border border-cyan-800 bg-cyan-950/40 p-3 text-sm text-cyan-50">この記録はこの端末に保存されます。</p>}
         <div className="mt-3 grid grid-cols-6 gap-1" aria-label="入力の進み具合">
           {Array.from({ length: 6 }, (_, index) => (
             <div key={index} className={`h-2 ${index <= stepIndex ? 'bg-cyan-400' : 'bg-slate-800'}`} />

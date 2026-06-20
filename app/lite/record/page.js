@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import LiteBetaBanner from '@/components/LiteBetaBanner'
 import { supabase } from '@/lib/supabase'
+import { LocalLiteStore } from '@/lib/localLiteStore'
 
 const RECORD_TYPES = {
   'water-change': { title: '水換えを記録', description: '今回の水換えと、いつもの頻度をまとめて残せます。' },
@@ -41,6 +42,7 @@ function RecordForm() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [isGuest, setIsGuest] = useState(false)
   const [form, setForm] = useState({
     tankVolume: '',
     frequencyDays: '',
@@ -64,7 +66,22 @@ function RecordForm() {
     async function load() {
       const { data: authData } = await supabase.auth.getSession()
       setSession(authData.session)
-      if (!authData.session || !tankId) {
+      if (!authData.session) {
+        const guest = new LocalLiteStore(window.localStorage).read()
+        if (guest && (!tankId || tankId === guest.tank.id)) {
+          setIsGuest(true)
+          setTank(guest.tank)
+          setForm(current => ({
+            ...current,
+            tankVolume: guest.tank.tank_volume_liters ?? '',
+            frequencyDays: guest.tank.water_change_frequency_days ?? '',
+            routineAmountLiters: guest.tank.water_change_volume_liters ?? '',
+          }))
+        }
+        setLoading(false)
+        return
+      }
+      if (!tankId) {
         setLoading(false)
         return
       }
@@ -112,12 +129,44 @@ function RecordForm() {
 
   async function save(event) {
     event.preventDefault()
-    if (!session?.user?.id || !tankId) return
+    if (!tankId || (!isGuest && !session?.user?.id)) return
     setSaving(true)
     setError('')
     let result
 
-    if (type === 'water-change') {
+    if (isGuest && type === 'water-change') {
+      try {
+        new LocalLiteStore(window.localStorage).addWaterChange({
+          changed_at: new Date(`${form.changedAt || new Date().toISOString().slice(0, 10)}T12:00:00`).toISOString(),
+          change_volume_liters: nullableNumber(form.amountLiters),
+          note: form.note.trim() || null,
+          tank_volume_liters: nullableNumber(form.tankVolume),
+          water_change_frequency_days: nullableInteger(form.frequencyDays),
+        })
+        result = { error: null }
+      } catch {
+        result = { error: true }
+      }
+    } else if (isGuest && type === 'additive') {
+      if (!form.productName.trim()) {
+        setError('添加剤の商品名を入力してください。')
+        setSaving(false)
+        return
+      }
+      try {
+        new LocalLiteStore(window.localStorage).addAdditive({
+          brand_snapshot: form.brand.trim() || null,
+          product_name_snapshot: form.productName.trim(),
+          amount_text: form.doseAmount.trim() || null,
+          frequency: form.frequency,
+          usage_note: form.note.trim() || null,
+          is_active: form.isActive,
+        })
+        result = { error: null }
+      } catch {
+        result = { error: true }
+      }
+    } else if (type === 'water-change') {
       result = await supabase.rpc('record_lite_water_change', {
         p_tank_id: tankId,
         p_changed_at: form.changedAt || new Date().toISOString().slice(0, 10),
@@ -167,7 +216,7 @@ function RecordForm() {
   }
 
   if (loading) return <Shell><p className="text-slate-300">入力画面を準備しています...</p></Shell>
-  if (!session || !tankId || !tank) {
+  if ((!session && !isGuest) || !tankId || !tank) {
     return (
       <Shell>
         <p className="border border-amber-700 bg-amber-950 p-4 text-amber-100">Liteホームから水槽を選んでください。</p>
@@ -190,6 +239,17 @@ function RecordForm() {
       </Shell>
     )
   }
+  if (isGuest && type === 'photo') {
+    return (
+      <Shell>
+        <section className="mx-auto max-w-xl border border-slate-700 bg-slate-900 p-6 text-center">
+          <h1 className="text-3xl font-bold text-white">写真を残すにはログインが必要です</h1>
+          <p className="mt-4 text-base leading-7 text-slate-300">写真は長期保存のためクラウドへ保存します。ゲストの記録は消さずにそのまま残ります。</p>
+          <Link href="/lite" className="mt-6 flex min-h-14 items-center justify-center bg-cyan-400 px-5 text-lg font-bold text-slate-950">Liteホームへ</Link>
+        </section>
+      </Shell>
+    )
+  }
 
   return (
     <Shell>
@@ -197,6 +257,7 @@ function RecordForm() {
         <p className="text-xs font-bold text-cyan-300">{tank.display_name || 'わたしの水槽'}</p>
         <h1 className="mt-1 text-3xl font-bold text-white">{definition.title}</h1>
         <p className="mt-2 text-sm text-slate-400">{definition.description}</p>
+        {isGuest && <p className="mt-4 border border-cyan-800 bg-cyan-950/40 p-3 text-sm text-cyan-50">この記録はこの端末に保存されます。</p>}
 
         <form onSubmit={save} className="mt-6 space-y-4">
           {type === 'water-change' && (
@@ -218,7 +279,7 @@ function RecordForm() {
 
           {type === 'additive' && (
             <>
-              <label className="block">
+              {!isGuest && <label className="block">
                 <span className="text-sm font-bold text-slate-200">登録済み添加剤から検索</span>
                 <input
                   type="search"
@@ -227,8 +288,8 @@ function RecordForm() {
                   placeholder="メーカー名または商品名"
                   className="mt-1 min-h-14 w-full border border-slate-600 bg-slate-950 px-4 text-lg text-white"
                 />
-              </label>
-              {form.productSearch.trim() && (
+              </label>}
+              {!isGuest && form.productSearch.trim() && (
                 <div className="max-h-56 overflow-y-auto border border-slate-700 bg-slate-900">
                   {filterProducts(products, form.productSearch).length ? filterProducts(products, form.productSearch).map(product => (
                     <button
@@ -249,7 +310,8 @@ function RecordForm() {
                   )) : <p className="p-4 text-sm text-slate-400">見つかりません。下の欄へ手入力できます。</p>}
                 </div>
               )}
-              {form.additiveId && <p className="border border-emerald-700 bg-emerald-950 p-3 text-sm text-emerald-100">添加剤DBの商品と連携しました。</p>}
+              {!isGuest && form.additiveId && <p className="border border-emerald-700 bg-emerald-950 p-3 text-sm text-emerald-100">登録済みの商品と連携しました。</p>}
+              {isGuest && <p className="border border-slate-700 bg-slate-900 p-3 text-sm text-slate-300">商品名は手入力できます。</p>}
               <TextField label="メーカー" value={form.brand} onChange={value => setField(setForm, 'brand', value)} placeholder="例: Red Sea" />
               <TextField label="商品名" value={form.productName} onChange={value => setField(setForm, 'productName', value)} placeholder="例: Reef Foundation B" required />
               <TextField label="1回の数量" value={form.doseAmount} onChange={value => setField(setForm, 'doseAmount', value)} placeholder="例: 5 ml" />
